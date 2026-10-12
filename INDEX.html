@@ -1,0 +1,1270 @@
+<!--INDEX.HTML-->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pingcon Finance Portal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f7f6;
+      color: #333;
+      margin: 0; padding: 20px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #F50057; font-family: 'Georgia', serif; margin: 0; }
+    .header p { color: #666; margin-top: 5px; }
+    
+    .card {
+      background: #fff;
+      width: 100%; max-width: 500px;
+      padding: 25px; margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      border-top: 4px solid #F50057;
+    }
+    .card h2 { margin-top: 0; font-size: 18px; color: #333; }
+    
+    label { font-weight: bold; font-size: 13px; display: block; margin-bottom: 6px; margin-top: 15px; }
+    select, input[type="file"], input[type="text"], input[type="date"] {
+      width: 100%; padding: 10px;
+      border: 1px solid #ccc; border-radius: 4px;
+      box-sizing: border-box; font-size: 14px;
+      background-color: white;
+    }
+    
+    button {
+      background-color: #F50057; color: white;
+      border: none; padding: 12px; width: 100%;
+      font-size: 15px; font-weight: bold; border-radius: 4px;
+      cursor: pointer; margin-top: 20px; transition: 0.3s;
+    }
+    button:hover { background-color: #d8004d; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    
+    .status {
+      margin-top: 15px; font-size: 13px; font-weight: bold; text-align: center;
+      padding: 10px; border-radius: 4px; display: none;
+    }
+    .status.success { background-color: #d4edda; color: #155724; display: block; border: 1px solid #c3e6cb;}
+    .status.error { background-color: #f8d7da; color: #721c24; display: block; border: 1px solid #f5c6cb;}
+    .status.loading { background-color: #e2e3e5; color: #383d41; display: block; border: 1px solid #d6d8db;}
+    
+    .note { font-size: 12px; color: #888; margin-top: 10px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <? if (!isAuthorized) { ?>
+  <div id="otp-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(243, 246, 249, 0.95); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+    <script>
+      if (sessionStorage.getItem('otp_verified_index') === 'true') {
+          document.getElementById('otp-overlay').style.display = 'none';
+      }
+    </script>
+    <div style="background:#fff; padding:40px 30px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); border:1px solid #eef2f7; text-align:center; max-width:400px; width:90%;">
+      <h2 style="margin-top:0; color:#F50057; font-weight:800; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">Security Verification</h2>
+      <p style="color:#8a96a3; font-size:14px; font-weight:600; margin-bottom: 5px;">An access code is required to open the Finance Portal.</p>
+      <p style="color:#495057; font-size:13px; margin-bottom: 25px;">The code will be sent to <br><b><?= assignedEmail ?></b></p>
+      
+      <div id="otp-step-1">
+        <button class="primary-btn" onclick="sendOtp()" id="btn-send-otp" style="margin-top: 0; width: 100%; padding: 12px; background-color: #F50057; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Send Access Code</button>
+      </div>
+      
+      <div id="otp-step-2" style="display:none;">
+        <input type="text" id="otp-input" placeholder="Enter 6-digit code" style="padding:15px; font-size:18px; font-weight:bold; color:#111c43; text-align:center; width:100%; box-sizing:border-box; letter-spacing:4px; border:1px solid #e2e5ec; background:#f8f9fa; border-radius:6px; outline:none; transition:0.3s;" onfocus="this.style.borderColor='#F50057'; this.style.backgroundColor='#fff';">
+        <br>
+        <button class="primary-btn" onclick="verifyOtp()" id="btn-verify-otp" style="margin-top:15px; width:100%; padding: 12px; background-color: #F50057; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">Verify Code</button>
+        <button class="secondary-btn" onclick="sendOtp()" id="btn-resend-otp" style="margin-top:10px; width:100%; display:none; padding: 12px; background-color: #f1f3f4; border: 1px solid #dadce0; border-radius: 4px; font-weight: bold; cursor: pointer; color: #3c4043;">Resend Code</button>
+      </div>
+      <div id="otp-timer" style="margin-top:15px; font-size:14px; font-weight:bold; color:#ea4335; display:none;"></div>
+      <div id="otp-msg" style="margin-top:15px; font-size:13px; font-weight:bold;"></div>
+    </div>
+  </div>
+
+  <script>
+    let otpInterval;
+
+    function startOtpTimer() {
+        clearInterval(otpInterval);
+        let timeLeft = 120;
+        document.getElementById('otp-timer').style.display = 'block';
+        document.getElementById('btn-resend-otp').style.display = 'none';
+        document.getElementById('btn-verify-otp').disabled = false;
+        
+        otpInterval = setInterval(function() {
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('otp-timer').innerText = 'Code expires in: ' + m + ':' + (s < 10 ? '0' : '') + s;
+            
+            if (timeLeft <= 0) {
+                clearInterval(otpInterval);
+                document.getElementById('otp-timer').style.display = 'none';
+                document.getElementById('otp-msg').style.color = '#ea4335';
+                document.getElementById('otp-msg').innerText = 'The code has expired. Please request a new one.';
+                document.getElementById('btn-verify-otp').disabled = true;
+                document.getElementById('btn-resend-otp').style.display = 'inline-block';
+            }
+        }, 1000);
+    }
+
+    function sendOtp() {
+      document.getElementById('btn-send-otp').innerText = 'Sending...';
+      document.getElementById('btn-send-otp').disabled = true;
+      if (document.getElementById('btn-resend-otp')) {
+          document.getElementById('btn-resend-otp').innerText = 'Sending...';
+          document.getElementById('btn-resend-otp').disabled = true;
+      }
+      document.getElementById('otp-msg').style.color = '#495057';
+      document.getElementById('otp-msg').innerText = '';
+      clearInterval(otpInterval);
+      document.getElementById('otp-timer').style.display = 'none';
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           document.getElementById('otp-step-1').style.display = 'none';
+           document.getElementById('otp-step-2').style.display = 'block';
+           document.getElementById('otp-msg').style.color = '#34a853';
+           document.getElementById('otp-msg').innerText = 'Code sent! Please check your email.';
+           if (document.getElementById('btn-resend-otp')) {
+               document.getElementById('btn-resend-otp').innerText = 'Resend Code';
+               document.getElementById('btn-resend-otp').disabled = false;
+           }
+           startOtpTimer();
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-send-otp').innerText = 'Send Access Code';
+           document.getElementById('btn-send-otp').disabled = false;
+           if (document.getElementById('btn-resend-otp')) {
+               document.getElementById('btn-resend-otp').innerText = 'Resend Code';
+               document.getElementById('btn-resend-otp').disabled = false;
+           }
+           document.getElementById('otp-msg').style.color = '#ea4335';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappSendNteOtp('index_portal', '<?= assignedEmail ?>');
+    }
+    
+    function verifyOtp() {
+      let code = document.getElementById('otp-input').value;
+      if (!code || code.length < 5) return;
+      
+      document.getElementById('btn-verify-otp').innerText = 'Verifying...';
+      document.getElementById('btn-verify-otp').disabled = true;
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              clearInterval(otpInterval);
+              document.getElementById('otp-overlay').style.display = 'none';
+              sessionStorage.setItem('otp_verified_index', 'true');
+           } else {
+              document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+              document.getElementById('btn-verify-otp').disabled = false;
+              document.getElementById('otp-msg').style.color = '#ea4335';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+           document.getElementById('btn-verify-otp').disabled = false;
+           document.getElementById('otp-msg').style.color = '#ea4335';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappVerifyNteOtp('index_portal', code);
+    }
+  </script>
+  <? } ?>
+
+  <!-- Logout button pinned to the absolute top-right corner of the window -->
+  <button onclick="doLogout()" style="position: absolute; top: 20px; right: 20px; background-color: #333; color: white; width: auto; padding: 8px 15px; margin: 0; font-size: 13px; border: none; border-radius: 4px; cursor: pointer; z-index: 1000;">Logout</button>
+
+  <div class="header">
+    <h1>Pingcon Finance Portal</h1>
+    <p>Upload files and run automated reports securely.</p>
+    <p style="font-size: 13px; font-weight: bold; color: #F50057; margin-top: 10px;">Remaining Emails per Recipient Today: <span id="emailQuotaDisplay">Loading...</span></p>
+    
+    
+  </div>
+  </div>
+
+  <script>
+    function checkOngoingReports() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          const btn = document.getElementById("reportBtn");
+          const uploadBtn = document.getElementById("uploadBtn");
+          const statusDiv = document.getElementById("reportStatus");
+          const emailDisplay = document.getElementById("emailQuotaDisplay");
+          
+          if (emailDisplay && res && res.emailQuota !== undefined) {
+             emailDisplay.innerText = res.emailQuota;
+          }
+          
+          if (res && res.type) {
+             if(btn) btn.disabled = true;
+             if(uploadBtn) uploadBtn.disabled = true;
+             const msg = "🔒 LOCKED: " + res.status;
+             if (statusDiv && statusDiv.innerHTML !== msg) {
+                 statusDiv.className = "status loading";
+                 statusDiv.innerHTML = msg; 
+                 statusDiv.style.display = "block";
+             }
+          } else {
+             if (btn && btn.disabled && statusDiv && statusDiv.innerText.includes("LOCKED")) {
+                 btn.disabled = false;
+                 if(uploadBtn) uploadBtn.disabled = false;
+                 statusDiv.style.display = "none";
+                 statusDiv.innerText = "";
+             }
+             if (statusDiv && res && res.lastError && !statusDiv.innerText.includes(res.lastError)) {
+                 statusDiv.className = "status error";
+                 statusDiv.innerHTML = "⚠️ " + res.lastError;
+                 statusDiv.style.display = "block";
+             }
+          }
+        })
+        .withFailureHandler(function(err) {
+          const emailDisplay = document.getElementById("emailQuotaDisplay");
+          if(emailDisplay) emailDisplay.innerText = "Error Loading";
+        })
+        .webappGetReportStatus();
+    }
+    
+    checkOngoingReports(); // Call instantly so you don't wait 4 seconds
+    setInterval(checkOngoingReports, 4000); // Polls system status every 4 seconds
+
+     
+  </script>
+
+  
+
+  <!-- UPLOAD SECTION -->
+  <div class="card">
+    <h2>Upload Input File & Auto-Import</h2>
+    
+    <label>Select Target Database Folder:</label>
+    <select id="uploadType">
+      <option value="AR">Ageing Report (AR)</option>
+      <option value="SR">Sales Report (SR)</option>
+      <option value="PO_PINGCON_BONITA">Purchase Orders Pingcon and Bonita (PO)</option>
+      <option value="PO_KEYSYS">Purchase Order Keysys & A2Z2GO (PO)</option>
+      <option value="SQ">Sales Quotas (SQ)</option>
+      <option value="AT">Account Titles</option>
+      <option value="PMC">PMC Directory</option>
+      <option value="BASKET">Basket Mapping</option>
+      <option value="SKU">Missing SKU Mapping</option>
+      <option value="AE_EMAILS">Email Address of AEs</option>
+      <option value="CPP">Customer Payment Performance</option>
+      <option value="NEW_NARRA">Standard Narra Database</option> <!-- ADD THIS LINE -->
+      
+    </select>
+
+    <label>Select Excel/CSV File:</label>
+    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" multiple>
+    
+    <div style="margin-top: 10px; margin-bottom: 15px; font-size: 13px;">
+      <label style="font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <input type="checkbox" id="requirePasswordCheck" checked>
+        My Excel files are password protected
+      </label>
+    </div>
+
+    <button id="uploadBtn" onclick="handleUpload()">Upload & Process File</button>
+    <div id="uploadStatus" class="status"></div>
+  </div>
+
+  <!-- BATCH REPORTS SECTION -->
+  <div class="card">
+    <h2>Run Automated Batch Reports</h2>
+    
+    <div style="margin-bottom: 15px; background: #e3f2fd; padding: 10px; border: 1px solid #90caf9; border-radius: 4px;">
+      <label style="margin: 0; font-weight: normal; cursor: pointer; color: #0d47a1;">
+        <input type="checkbox" id="testModeCheckbox"> <strong>Enable Test Mode</strong> (Appends <code>.test</code> to all outgoing emails)
+      </label>
+    </div>
+    <label>Select Report/Action to Run:</label>
+    <select id="reportAction" onchange="renderList()">
+      <option value="UNPAID_DR_AE">Send All Unpaid DRs (SOA per AE)</option>
+      <option value="UNPAID_DR_CUST">Send All Unpaid DRs (SOA per Customer)</option>
+      <option value="UNPAID_DR_OVERDUE">Send Consolidated & Overdue Aging Report</option> 
+      <option value="SALES_REPORT_CONSOLIDATED">Send Consolidated Sales Report Summary</option>
+      <option value="BUY_SELL_REPORT">Send All Buy/Sell Reports</option>
+      <option value="COMMISSION_REPORT">Send All Commission Reports</option>
+      <option value="PURCHASE_REPORT">Send All Purchase Reports</option>
+      <option value="EWT_CLIENT_REPORT">Send All EWT Client Reports</option>
+      <option value="CHECK_PO_PAYMENT">Check PO Payment Status</option>
+      <option value="CPP_REPORT">Send Customer Payment Performance</option>
+      <option value="NIGHTLY_NARRA">Nightly Narra</option>
+    </select>
+
+    <div id="entityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="margin-top: 0; margin-bottom: 8px;">Select Entities to Include:</label>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <strong style="width: 60px;">Group 1:</strong>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="salesEntity" value="Pingcon" checked onchange="filterAEs()"> Pingcon</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="salesEntity" value="Bonita" checked onchange="filterAEs()"> Bonita</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="salesEntity" value="A2ZPMC" checked onchange="filterAEs()"> A2ZPMC</label>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+          <strong style="width: 60px;">Group 2:</strong>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="salesEntity" value="Keysys" checked onchange="filterAEs()"> Keysys</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="salesEntity" value="A2ZIT" checked onchange="filterAEs()"> A2ZIT</label>
+        </div>
+      </div>
+    </div>
+    
+    <div id="salesEntityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="margin-top: 0; margin-bottom: 8px;">Select Entities to Include:</label>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="srEntity" value="Pingcon,Bonita,A2ZPMC" checked onchange="filterAEs()"> Pingcon</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="srEntity" value="Keysys,A2ZIT" checked onchange="filterAEs()"> A2Z2GO</label>
+        </div>
+      </div>
+    </div>
+    <div id="ewtEntityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="margin-top: 0; margin-bottom: 8px;">Select Payors to Include:</label>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="ewtEntity" value="Pingcon" checked> Pingcon</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="ewtEntity" value="Bonita" checked> Bonita</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="ewtEntity" value="Keysys" checked> Keysys</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="ewtEntity" value="A2Z2GO" checked> A2Z2GO</label>
+        </div>
+      </div>
+    </div>
+    <div id="narraEntityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="margin-top: 0; margin-bottom: 8px;">Select Entities to Include:</label>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="narraEntity" value="Pingcon" checked onchange="filterNarraBanks()"> Pingcon</label>
+          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="narraEntity" value="Keysys" checked onchange="filterNarraBanks()"> Keysys</label>
+        </div>
+      </div>
+    </div>
+    <div id="narraBankContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="margin-top: 0; margin-bottom: 8px;">Select Banks to Include:</label>
+      <div style="margin-bottom: 8px; font-size: 12px; display: flex; align-items: center;">
+        <div>
+          <a href="#" onclick="selectAllBanks(true); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Select All</a> | 
+          <a href="#" onclick="selectAllBanks(false); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Clear Selection</a>
+        </div>
+        <div id="selectedBankCountDisplay" style="margin-left: auto; font-weight: bold; color: #F50057; background: #ffe6ee; padding: 2px 8px; border-radius: 4px;">0 selected</div>
+      </div>
+      <div id="narraBankList" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 5px; font-size: 13px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="color: #888;">Loading Banks...</span>
+      </div>
+    </div>
+    <div id="aeContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label id="aeLabel" style="margin-top: 0; margin-bottom: 8px;">Select Account Executives:</label>
+      <input type="text" id="aeSearchInput" placeholder="Search AE..." style="margin-bottom: 8px; padding: 5px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box;" onkeyup="filterAEs()">
+      <div style="margin-bottom: 8px; font-size: 12px; display: flex; align-items: center;">
+        <div>
+          <a href="#" onclick="selectAllAEs(true); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Select All</a> | 
+          <a href="#" onclick="selectAllAEs(false); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Clear Selection</a>
+        </div>
+        <div id="selectedCountDisplay" style="margin-left: auto; font-weight: bold; color: #F50057; background: #ffe6ee; padding: 2px 8px; border-radius: 4px;">0 selected</div>
+      </div>
+      <label id="exclusionInstruction" style="margin-top: 5px; margin-bottom: 4px; font-size: 11px; font-weight: normal; color: #555; display: none;">
+        <em>Instruction: To resume a paused run, check your <b>Sent Emails</b> and search for the subject mentioned. Copy the names inside that email and paste them below to automatically exclude them.</em>
+      </label>
+      <textarea id="exclusionList" placeholder="Paste names to exclude here..." style="width: 100%; height: 50px; margin-bottom: 8px; padding: 5px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; display: none;" oninput="filterAEs()"></textarea>
+      <div id="aeList" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 5px; font-size: 13px; display: flex; flex-direction: column; gap: 4px;">
+        <span style="color: #888;">Loading AEs...</span>
+      </div>
+    </div>
+    
+    <div id="quarterContainer" style="display: none; gap: 10px; margin-top: 15px;">
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">Select Quarter:</label>
+        <select id="quarterSelect" onchange="filterAEs()">
+          <option value="Q1">Q1 (Jan - Mar)</option>
+          <option value="Q2">Q2 (Apr - Jun)</option>
+          <option value="Q3">Q3 (Jul - Sep)</option>
+          <option value="Q4">Q4 (Oct - Dec)</option>
+        </select>
+      </div>
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">Select Year:</label>
+        <select id="yearSelect" onchange="filterAEs()"></select>
+      </div>
+    </div>
+    <div id="monthYearContainer" style="display: none; gap: 10px; margin-top: 15px;">
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">Select Month:</label>
+        <select id="monthSelectEwt" onchange="filterAEs()">
+          <option value="January">January</option><option value="February">February</option>
+          <option value="March">March</option><option value="April">April</option>
+          <option value="May">May</option><option value="June">June</option>
+          <option value="July">July</option><option value="August">August</option>
+          <option value="September">September</option><option value="October">October</option>
+          <option value="November">November</option><option value="December">December</option>
+        </select>
+      </div>
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">Select Year:</label>
+        <select id="yearSelectEwt" onchange="filterAEs()"></select>
+      </div>
+    </div>
+    
+
+    <div id="dateContainer" style="display: flex; gap: 10px; margin-top: 15px;">
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">Start Date (MM/DD/YYYY):</label>
+        <input type="text" id="reportStartDate" placeholder="Loading...">
+      </div>
+      <div style="flex: 1;">
+        <label style="margin-top: 0;">End Date (MM/DD/YYYY):</label>
+        <input type="text" id="reportEndDate" placeholder="Loading...">
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button id="reportBtn" style="margin-top: 0;" onclick="handleReport()">Run Selected Report</button>
+      <button id="cancelBtn" style="margin-top: 0; background-color: #888;" onclick="cancelReport()">Cancel Batch</button>
+    </div>
+    <div id="reportStatus" class="status"></div>
+    
+  </div>
+
+  <script>
+    let globalAEs = [];
+    let globalCustomers = [];
+    let globalCppCustomers = [];
+    let globalMinDate = null;
+    let globalMaxDate = null;
+    let globalEwtMinDate = null;
+    let globalEwtMaxDate = null;
+    let globalNarraMinDate = null;
+    let globalNarraMaxDate = null;
+    let globalNarraBanks = []; // <--- ADD THIS
+    let fpStart = null;
+    let fpEnd = null;
+    let globalCppYears = [];
+    let globalJsonMonths = [];
+
+    (function loadInitialData() {
+      google.script.run
+        .withSuccessHandler(function(bounds) {
+          globalAEs = bounds.aes;
+          globalCustomers = bounds.customers || [];
+          globalCppCustomers = bounds.cppCustomers || [];
+          globalMinDate = bounds.min;
+          globalMaxDate = bounds.max;
+          globalEwtMinDate = bounds.ewtMin;
+          globalEwtMaxDate = bounds.ewtMax;
+          globalNarraMinDate = bounds.narraMin;
+          globalNarraMaxDate = bounds.narraMax;
+          globalNarraBanks = bounds.narraBanks || [];
+          globalCppYears = bounds.cppYears || [];
+          globalJsonMonths = bounds.jsonMonths || [];
+
+          
+          
+          // Populate Narra Bank Checkboxes
+          let bankListDiv = document.getElementById("narraBankList");
+          if (bankListDiv) {
+              bankListDiv.innerHTML = "";
+              globalNarraBanks.forEach(bObj => {
+                  let lbl = document.createElement("label");
+                  lbl.className = "narra-bank-item";
+                  lbl.style.margin = "0"; lbl.style.fontWeight = "normal"; lbl.style.cursor = "pointer";
+                  lbl.setAttribute("data-entities", JSON.stringify(bObj.entities));
+                  lbl.innerHTML = `<input type="checkbox" name="narraBank" value="${bObj.name.replace(/"/g, '&quot;')}" checked onchange="updateSelectedBankCount()"> <span>${bObj.name}</span>`;
+                  bankListDiv.appendChild(lbl);
+              });
+              if (globalNarraBanks.length === 0) bankListDiv.innerHTML = "<span style='color:red;'>No Banks found in Database.</span>";
+              filterNarraBanks(); // Initialize filter and count
+          }
+
+          let yearSelect = document.getElementById("yearSelect");
+          if (yearSelect) {
+             yearSelect.innerHTML = "";
+             globalCppYears.forEach(y => {
+                let opt = document.createElement("option");
+                opt.value = y; opt.text = y;
+                yearSelect.appendChild(opt);
+             });
+             if(globalCppYears.length === 0) {
+                let opt = document.createElement("option");
+                opt.value = new Date().getFullYear(); opt.text = new Date().getFullYear();
+                yearSelect.appendChild(opt);
+             }
+          }
+          let yearSelectEwt = document.getElementById("yearSelectEwt");
+          if (yearSelectEwt) {
+             yearSelectEwt.innerHTML = "";
+             globalCppYears.forEach(y => {
+                let opt = document.createElement("option");
+                opt.value = y; opt.text = y;
+                yearSelectEwt.appendChild(opt);
+             });
+             if(globalCppYears.length === 0) {
+                let opt = document.createElement("option");
+                opt.value = new Date().getFullYear(); opt.text = new Date().getFullYear();
+                yearSelectEwt.appendChild(opt);
+             }
+          }
+
+          fpStart = flatpickr("#reportStartDate", {
+            dateFormat: "Y-m-d", 
+            altInput: true,
+            altFormat: "m/d/Y", 
+            allowInput: true,
+            minDate: bounds.min,
+            maxDate: bounds.max,
+            defaultDate: bounds.min,
+            onChange: function() { filterAEs(); },
+            onClose: function(selectedDates, dateStr, instance) {
+              if (selectedDates.length === 0) instance.setDate(instance.config.minDate);
+              filterAEs();
+            }
+          });
+          
+          fpEnd = flatpickr("#reportEndDate", {
+            dateFormat: "Y-m-d",
+            altInput: true,
+            altFormat: "m/d/Y",
+            allowInput: true,
+            minDate: bounds.min,
+            maxDate: bounds.max,
+            defaultDate: bounds.max,
+            onChange: function() { filterAEs(); },
+            onClose: function(selectedDates, dateStr, instance) {
+              if (selectedDates.length === 0) instance.setDate(instance.config.maxDate);
+              filterAEs();
+            }
+          });
+
+          renderList(); 
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById("reportStartDate").placeholder = "Error loading dates";
+          document.getElementById("reportEndDate").placeholder = "Error loading dates";
+          alert("Database connection timeout. Please refresh the page and try again.");
+        })
+        .webappGetDateBounds();
+    })();
+
+    function renderList() {
+      const action = document.getElementById("reportAction").value;
+      const aeListDiv = document.getElementById("aeList");
+      const labelEl = document.getElementById("aeLabel");
+      const searchInput = document.getElementById("aeSearchInput");
+
+      aeListDiv.innerHTML = "";
+      
+      let dataToRender = [];
+      let checkByDefault = true;
+      if (action === "CPP_REPORT") {
+          dataToRender = globalCppCustomers;
+          labelEl.innerText = "Select Customers:";
+          searchInput.placeholder = "Search Customer...";
+          checkByDefault = false; 
+      } else if (action === "UNPAID_DR_CUST" || action === "UNPAID_DR_OVERDUE") {
+          dataToRender = globalCustomers;
+          labelEl.innerText = "Select Customers:";
+          searchInput.placeholder = "Search Customer...";
+          checkByDefault = false; 
+      } else {
+          dataToRender = globalAEs;
+          labelEl.innerText = "Select Account Executives:";
+          searchInput.placeholder = "Search AE...";
+          checkByDefault = true;
+      }
+
+      dataToRender.forEach(obj => {
+        const label = document.createElement("label");
+        label.style.margin = "0"; label.style.fontWeight = "normal"; label.style.cursor = "pointer";
+        label.className = "ae-item";
+        label.setAttribute("data-entities", JSON.stringify(obj.entities));
+        label.setAttribute("data-min", obj.minDate);
+        label.setAttribute("data-max", obj.maxDate);
+        const safeName = obj.name.replace(/"/g, '&quot;');
+        const checkedAttr = checkByDefault ? "checked" : "";
+        label.innerHTML = `<input type="checkbox" name="salesAE" value="${safeName}" ${checkedAttr} onchange="updateSelectedCount()"> <span class="ae-name">${obj.name}</span>`;
+        aeListDiv.appendChild(label);
+      });
+      
+      // FIX: Toggle dates first to secure variables, then filter once accurately.
+      toggleDateVisibility();
+      filterAEs();
+    }
+
+    function filterAEs() {
+      const action = document.getElementById("reportAction").value;
+      const search = document.getElementById("aeSearchInput").value.toLowerCase().trim();
+      const items = document.querySelectorAll(".ae-item");
+      
+      let checkedEntities = [];
+      if (action === "SALES_REPORT_CONSOLIDATED") {
+          Array.from(document.querySelectorAll('input[name="srEntity"]:checked')).forEach(cb => {
+              cb.value.split(",").forEach(v => checkedEntities.push(v));
+          });
+      } else {
+          checkedEntities = Array.from(document.querySelectorAll('input[name="salesEntity"]:checked')).map(cb => cb.value);
+      }
+
+      let selectedStart = 0;
+      let selectedEnd = Infinity;
+
+      if (action === "CPP_REPORT") {
+          const q = document.getElementById("quarterSelect").value;
+          const y = parseInt(document.getElementById("yearSelect").value);
+          if (!isNaN(y)) {
+              let mStart = 0, mEnd = 2;
+              if (q === "Q2") { mStart = 3; mEnd = 5; }
+              if (q === "Q3") { mStart = 6; mEnd = 8; }
+              if (q === "Q4") { mStart = 9; mEnd = 11; }
+              selectedStart = new Date(y, mStart, 1).getTime();
+              selectedEnd = new Date(y, mEnd + 1, 0, 23, 59, 59, 999).getTime();
+          }
+      } else {
+          const startDateStr = document.getElementById("reportStartDate").value;
+          const endDateStr = document.getElementById("reportEndDate").value;
+          selectedStart = startDateStr ? new Date(startDateStr).getTime() : 0;
+          selectedEnd = endDateStr ? new Date(endDateStr).setHours(23, 59, 59, 999) : Infinity;
+      }
+
+      const exclusionText = document.getElementById("exclusionList").value.toLowerCase();
+      const excludedNames = exclusionText.split(/[\n]+/)
+        .map(n => n.replace(/^\d+\.\s*/, '').trim())
+        .filter(n => n !== "" && !n.endsWith(":"));
+
+      // CONSOLE LOG INJECTION FOR DEBUGGING
+      console.log(`[DEBUG] filterAEs Triggered | Action: ${action} | Checkbox Target Count: ${items.length}`);
+      console.log(`[DEBUG] Checked Entities:`, checkedEntities);
+      
+      let matchCount = 0;
+      let failEntityCount = 0;
+      let failDateCount = 0;
+      let failSearchCount = 0;
+
+      items.forEach(item => {
+        const name = item.querySelector(".ae-name").innerText.toLowerCase();
+        
+        
+
+        const aeEntities = JSON.parse(item.getAttribute("data-entities") || "[]");
+        const aeMin = parseInt(item.getAttribute("data-min"));
+        const aeMax = parseInt(item.getAttribute("data-max"));
+        
+        const matchesEntity = aeEntities.some(entity => checkedEntities.includes(entity));
+        let matchesSearch = true;
+        if (search !== "") matchesSearch = name.startsWith(search);
+        
+        let matchesDate = true;
+        if (!isNaN(aeMin) && !isNaN(aeMax)) {
+            matchesDate = (aeMin <= selectedEnd && aeMax >= selectedStart);
+        }
+        
+        // Log Tracker
+        if (!matchesEntity) failEntityCount++;
+        else if (!matchesDate) failDateCount++;
+        else if (!matchesSearch) failSearchCount++;
+        else matchCount++;
+
+        if (matchesEntity && matchesSearch && matchesDate) {
+           item.style.display = "block";
+        } else {
+           item.style.display = "none";
+           if (!matchesEntity || !matchesDate) item.querySelector("input").checked = false;
+        }
+
+        if (excludedNames.includes(name)) {
+           item.querySelector("input").checked = false;
+        }
+      });
+      
+      // Output Result to Console
+      console.log(`[DEBUG] Result -> Visible/Matched: ${matchCount} | Hidden by Entity: ${failEntityCount} | Hidden by Date: ${failDateCount} | Hidden by Search: ${failSearchCount}`);
+      
+      updateSelectedCount();
+    }
+
+    function selectAllAEs(check) {
+      const exclusionText = document.getElementById("exclusionList").value.toLowerCase();
+      const excludedNames = exclusionText.split(/[\n]+/)
+        .map(n => n.replace(/^\d+\.\s*/, '').trim())
+        .filter(n => n !== "" && !n.endsWith(":"));
+      
+      const items = document.querySelectorAll(".ae-item");
+      items.forEach(item => {
+        if (item.style.display !== "none") {
+           const name = item.querySelector(".ae-name").innerText.toLowerCase();
+           const isExcluded = excludedNames.includes(name);
+           
+           if (check && isExcluded) {
+               item.querySelector("input").checked = false; 
+           } else {
+               item.querySelector("input").checked = check;
+           }
+        }
+      });
+      updateSelectedCount();
+    }
+
+    function updateSelectedCount() {
+      const countDisplay = document.getElementById("selectedCountDisplay");
+      if (countDisplay) {
+         const checkedCount = document.querySelectorAll('.ae-item input[name="salesAE"]:checked').length;
+         countDisplay.innerText = checkedCount + " selected";
+      }
+    }
+
+    function selectAllBanks(check) {
+      const labels = document.querySelectorAll('#narraBankList .narra-bank-item');
+      labels.forEach(lbl => {
+          if (lbl.style.display !== "none") {
+              lbl.querySelector('input').checked = check;
+          }
+      });
+      updateSelectedBankCount();
+    }
+
+    function updateSelectedBankCount() {
+      const countDisplay = document.getElementById("selectedBankCountDisplay");
+      if (countDisplay) {
+         const checkedCount = document.querySelectorAll('#narraBankList input[name="narraBank"]:checked').length;
+         countDisplay.innerText = checkedCount + " selected";
+      }
+    }
+    
+    function filterNarraBanks() {
+      const checkedEntities = Array.from(document.querySelectorAll('input[name="narraEntity"]:checked')).map(cb => cb.value.toUpperCase());
+      const labels = document.querySelectorAll('#narraBankList .narra-bank-item');
+      
+      labels.forEach(lbl => {
+          const bankEntities = JSON.parse(lbl.getAttribute("data-entities") || "[]").map(e => String(e).toUpperCase());
+          const matches = bankEntities.some(entity => checkedEntities.includes(entity));
+          
+          if (matches) {
+              lbl.style.display = "block";
+          } else {
+              lbl.style.display = "none";
+              lbl.querySelector("input").checked = false;
+          }
+      });
+      updateSelectedBankCount();
+    }
+
+    function toggleDateVisibility() {
+      const action = document.getElementById("reportAction").value;
+      const dateContainer = document.getElementById("dateContainer");
+      const entityContainer = document.getElementById("entityContainer");
+      const aeContainer = document.getElementById("aeContainer");
+      const quarterContainer = document.getElementById("quarterContainer");
+      const exclusionList = document.getElementById("exclusionList");
+      const exclusionInstruction = document.getElementById("exclusionInstruction");
+      
+      if (action === "UNPAID_DR_CUST") {
+          exclusionInstruction.innerHTML = '<em>Instruction: To resume a paused run, check your <b>Sent Emails</b> and search for the subject <strong>"Customers who Received Email on"</strong>. Copy the names inside that email and paste them below to automatically exclude them.</em>';
+          exclusionInstruction.style.display = "block";
+          exclusionList.style.display = "block";
+      } else {
+          exclusionInstruction.style.display = "none";
+          exclusionList.style.display = "none";
+          exclusionList.value = ""; 
+      }
+      
+      if (action.startsWith("NTE_") || action === "CHECK_PO_PAYMENT" || action === "CPP_REPORT") dateContainer.style.display = "none";
+      else dateContainer.style.display = "flex";
+
+      const monthYearContainer = document.getElementById("monthYearContainer");
+
+      if (action === "CPP_REPORT") quarterContainer.style.display = "flex";
+      else quarterContainer.style.display = "none";
+
+      monthYearContainer.style.display = "none";
+      
+      if (action.startsWith("NTE_") || action === "CHECK_PO_PAYMENT" || action === "CPP_REPORT") {
+          dateContainer.style.display = "none";
+      } else {
+          dateContainer.style.display = "flex";
+      }
+
+      // FIX: Added ", false" to explicitly stop Flatpickr from emitting 'onChange' events prematurely
+      if (fpStart && fpEnd) {
+          if (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") {
+              fpStart.set("minDate", globalEwtMinDate);
+              fpStart.set("maxDate", globalEwtMaxDate);
+              fpStart.setDate(globalEwtMinDate, false);
+              fpEnd.set("minDate", globalEwtMinDate);
+              fpEnd.set("maxDate", globalEwtMaxDate);
+              fpEnd.setDate(globalEwtMaxDate, false);
+          } else if (action === "NIGHTLY_NARRA") {
+              fpStart.set("minDate", globalNarraMinDate);
+              fpStart.set("maxDate", globalNarraMaxDate);
+              fpStart.setDate(globalNarraMinDate, false);
+              fpEnd.set("minDate", globalNarraMinDate);
+              fpEnd.set("maxDate", globalNarraMaxDate);
+              fpEnd.setDate(globalNarraMaxDate, false);
+          } else {
+              fpStart.set("minDate", globalMinDate);
+              fpStart.set("maxDate", globalMaxDate);
+              fpStart.setDate(globalMinDate, false);
+              fpEnd.set("minDate", globalMinDate);
+              fpEnd.set("maxDate", globalMaxDate);
+              fpEnd.setDate(globalMaxDate, false);
+          }
+      }
+      
+      if (action === "SALES_REPORT_CONSOLIDATED") {
+        entityContainer.style.display = "none";
+        document.getElementById("salesEntityContainer").style.display = "block";
+        document.getElementById("ewtEntityContainer").style.display = "none";
+        document.getElementById("narraEntityContainer").style.display = "none";
+        document.getElementById("narraBankContainer").style.display = "none";
+        aeContainer.style.display = "block";
+      } else if (action === "UNPAID_DR_AE" || action === "UNPAID_DR_CUST" || action === "UNPAID_DR_OVERDUE" || action === "BUY_SELL_REPORT" || action === "COMMISSION_REPORT" || action === "CPP_REPORT") {
+        entityContainer.style.display = "block";
+        document.getElementById("salesEntityContainer").style.display = "none";
+        document.getElementById("ewtEntityContainer").style.display = "none";
+        document.getElementById("narraEntityContainer").style.display = "none";
+        document.getElementById("narraBankContainer").style.display = "none";
+        aeContainer.style.display = "block";
+      } else if (action === "EWT_CLIENT_REPORT") {
+        entityContainer.style.display = "block";
+        document.getElementById("salesEntityContainer").style.display = "none";
+        document.getElementById("ewtEntityContainer").style.display = "none";
+        document.getElementById("narraEntityContainer").style.display = "none";
+        document.getElementById("narraBankContainer").style.display = "none";
+        aeContainer.style.display = "none";
+      } else if (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") {
+        entityContainer.style.display = "none";
+        document.getElementById("salesEntityContainer").style.display = "none";
+        document.getElementById("ewtEntityContainer").style.display = "block";
+        document.getElementById("narraEntityContainer").style.display = "none";
+        document.getElementById("narraBankContainer").style.display = "none";
+        aeContainer.style.display = "none";
+      } else if (action === "NIGHTLY_NARRA") {
+        entityContainer.style.display = "none";
+        document.getElementById("salesEntityContainer").style.display = "none";
+        document.getElementById("ewtEntityContainer").style.display = "none";
+        document.getElementById("narraEntityContainer").style.display = "block";
+        document.getElementById("narraBankContainer").style.display = "block";
+        aeContainer.style.display = "none";
+      } else {
+        entityContainer.style.display = "none";
+        document.getElementById("salesEntityContainer").style.display = "none";
+        document.getElementById("ewtEntityContainer").style.display = "none";
+        document.getElementById("narraEntityContainer").style.display = "none";
+        document.getElementById("narraBankContainer").style.display = "none";
+        aeContainer.style.display = "none";
+      }
+    }
+
+    // --- UPLOAD HANDLER ---
+    function handleUpload() {
+      const fileInput = document.getElementById("fileInput");
+      const uploadType = document.getElementById("uploadType").value;
+      const statusDiv = document.getElementById("uploadStatus");
+      const btn = document.getElementById("uploadBtn");
+
+      if (fileInput.files.length === 0) {
+        showStatus(statusDiv, "No files selected. Checking for stuck files in folder...", "loading");
+        btn.disabled = true;
+        
+        google.script.run
+          .withSuccessHandler(function(res) {
+             if(res === "NO_FILES") {
+                showStatus(statusDiv, "No stuck files found. Please select a file to upload.", "error");
+                btn.disabled = false;
+             } else {
+                showStatus(statusDiv, `Found ${res} stuck file(s). Processing now...`, "loading");
+                setTimeout(function() { pollImportProgress(uploadType, res, statusDiv, btn); }, 3000);
+             }
+          })
+          .withFailureHandler(function(e) {
+             showStatus(statusDiv, "Error: " + e.message, "error");
+             btn.disabled = false;
+          })
+          .webappProcessStuckFiles(uploadType);
+        return;
+      }
+
+      btn.disabled = true;
+      document.getElementById("reportBtn").disabled = true;
+      document.getElementById("cancelBtn").disabled = true;
+      showStatus(statusDiv, "Checking system availability...", "loading");
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (response === "BUSY" || response === "BUSY_IMPORT" || response === "BUSY_REPORT") {
+            showStatus(statusDiv, "System is locked! A batch report or background task is currently running.", "error");
+            btn.disabled = false;
+            document.getElementById("reportBtn").disabled = false;
+            document.getElementById("cancelBtn").disabled = false;
+            return;
+          }
+          startUploadProcess(fileInput.files, uploadType, statusDiv, btn);
+        })
+        .withFailureHandler(function(error) {
+          showStatus(statusDiv, "Error checking system: " + error.message, "error");
+          btn.disabled = false;
+          document.getElementById("reportBtn").disabled = false;
+          document.getElementById("cancelBtn").disabled = false;
+        })
+        .webappRequestUploadLock();
+    }
+
+    function pollImportProgress(uploadType, totalFiles, statusDiv, btn) {
+      const reportBtn = document.getElementById("reportBtn");
+      const cancelBtn = document.getElementById("cancelBtn");
+      
+      google.script.run
+        .withSuccessHandler(function(status) {
+          if (status.done) {
+            showStatus(statusDiv, `Successfully uploaded and imported ${totalFiles} file(s)! Refreshing page to update dates...`, "success");
+            setTimeout(function() { window.location.reload(); }, 2000);
+          } else if (status.inBackground) {
+            showStatus(statusDiv, `Running in background... ${status.filesLeft} file(s) remaining.`, "loading");
+            setTimeout(function() { pollImportProgress(uploadType, totalFiles, statusDiv, btn); }, 8000);
+          } else {
+            showStatus(statusDiv, `Processing finished, but ${status.filesLeft} file(s) are still syncing. Click Upload again without selecting files to force processing.`, "error");
+            btn.disabled = false; reportBtn.disabled = false; cancelBtn.disabled = false;
+            document.getElementById("fileInput").value = "";
+          }
+        })
+        .withFailureHandler(function(error) {
+          showStatus(statusDiv, "Error checking progress: " + error.message, "error");
+          btn.disabled = false; reportBtn.disabled = false; cancelBtn.disabled = false;
+        })
+        .webappCheckImportStatus(uploadType);
+    }
+    
+    async function startUploadProcess(files, uploadType, statusDiv, btn) {
+      showStatus(statusDiv, "Preparing files...", "loading");
+      let processedFiles = [];
+      
+      let requiresPassword = document.getElementById("requirePasswordCheck").checked;
+      
+      for (let i = 0; i < files.length; i++) {
+        let file = files[i];
+        let pwd = "";
+        let base64Data = await readFileAsBase64(file);
+
+        if (requiresPassword) {
+            pwd = await customPasswordPrompt(`Please enter the password for:<br><strong>${file.name}</strong><br><br><span style="font-size:12px; color:#666;">(Leave blank and click OK if the file has no password)</span>`);
+            
+            if (pwd === null) {
+              showStatus(statusDiv, "Upload cancelled by user.", "error");
+              btn.disabled = false;
+              google.script.run.webappReleaseUploadLock();
+              return;
+            }
+
+            if (pwd.trim() !== "") {
+              showStatus(statusDiv, `Unlocking ${file.name}... Please wait.`, "loading");
+              try {
+                let response = await fetch("<?= SCRIPT_PROPS['PYTHON_DECRYPT_URL'] ?>", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ file: base64Data, password: pwd.trim() })
+                });
+                let result = await response.json();
+                
+                if (!response.ok) {
+                  showStatus(statusDiv, `Incorrect password for ${file.name}! Upload aborted.`, "error");
+                  btn.disabled = false;
+                  google.script.run.webappReleaseUploadLock();
+                  return;
+                }
+                base64Data = result.decrypted_base64;
+              } catch (e) {
+                showStatus(statusDiv, `Failed to connect to decryption server.`, "error");
+                btn.disabled = false;
+                google.script.run.webappReleaseUploadLock();
+                return;
+              }
+            }
+        }
+        processedFiles.push({ name: file.name, data: base64Data });
+      }
+
+      // Lock the database ONLY AFTER passwords are typed and correct
+      google.script.run.webappSetUploadLock();
+
+      let currentIndex = 0;
+      let failedFiles = [];
+
+      function uploadNext() {
+        if (currentIndex >= processedFiles.length) {
+          if (failedFiles.length > 0) {
+             showStatus(statusDiv, `Upload finished, but ${failedFiles.length} file(s) failed. Starting import process for successful ones...`, "loading");
+          } else {
+             showStatus(statusDiv, `All files uploaded! Starting background import process...`, "loading");
+          }
+          
+          google.script.run
+             .withSuccessHandler(function() {
+                 setTimeout(function() { pollImportProgress(uploadType, processedFiles.length - failedFiles.length, statusDiv, btn); }, 3000);
+             })
+             .webappProcessStuckFiles(uploadType);
+          return;
+        }
+
+        let currentFile = processedFiles[currentIndex];
+        showStatus(statusDiv, `Uploading file ${currentIndex + 1} of ${processedFiles.length}: ${currentFile.name}...`, "loading");
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (response.startsWith("Success")) {
+              currentIndex++;
+              setTimeout(uploadNext, 1500);
+            } else {
+              failedFiles.push(currentFile.name);
+              console.error("Failed to upload " + currentFile.name + ": " + response);
+              currentIndex++;
+              setTimeout(uploadNext, 1500);
+            }
+          })
+          .withFailureHandler(function(error) {
+            failedFiles.push(currentFile.name);
+            console.error("Server Error on " + currentFile.name + ": " + error.message);
+            currentIndex++;
+            setTimeout(uploadNext, 1500);
+          })
+          .webappUploadFile(currentFile.data, currentFile.name, uploadType);
+      }
+
+      uploadNext();
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function customPasswordPrompt(messageHtml) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed'; overlay.style.top = '0'; overlay.style.left = '0';
+        overlay.style.width = '100%'; overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.6)';
+        overlay.style.display = 'flex'; overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center'; overlay.style.zIndex = '9999';
+
+        const modal = document.createElement('div');
+        modal.style.backgroundColor = '#fff'; modal.style.padding = '25px';
+        modal.style.borderRadius = '8px'; modal.style.width = '350px';
+        modal.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+        modal.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+
+        const msg = document.createElement('p');
+        msg.innerHTML = messageHtml; msg.style.fontSize = '14px';
+        msg.style.marginBottom = '15px'; msg.style.marginTop = '0'; msg.style.color = '#333';
+        modal.appendChild(msg);
+
+        const input = document.createElement('input');
+        input.type = 'password'; input.style.width = '100%'; input.style.padding = '10px';
+        input.style.marginBottom = '20px'; input.style.boxSizing = 'border-box';
+        input.style.border = '1px solid #ccc'; input.style.borderRadius = '4px';
+        input.style.fontSize = '14px'; input.placeholder = "Enter password or leave blank...";
+        modal.appendChild(input);
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.display = 'flex'; btnContainer.style.justifyContent = 'flex-end'; btnContainer.style.gap = '10px';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.innerText = 'Cancel'; cancelBtn.style.padding = '10px 15px';
+        cancelBtn.style.backgroundColor = '#f1f1f1'; cancelBtn.style.border = '1px solid #ccc';
+        cancelBtn.style.borderRadius = '4px'; cancelBtn.style.cursor = 'pointer';
+        cancelBtn.style.color = '#333'; cancelBtn.style.fontWeight = 'bold';
+        cancelBtn.style.width = 'auto'; cancelBtn.style.marginTop = '0';
+
+        const okBtn = document.createElement('button');
+        okBtn.innerText = 'OK'; okBtn.style.padding = '10px 15px';
+        okBtn.style.backgroundColor = '#F50057'; okBtn.style.color = 'white';
+        okBtn.style.border = 'none'; okBtn.style.borderRadius = '4px';
+        okBtn.style.cursor = 'pointer'; okBtn.style.fontWeight = 'bold';
+        okBtn.style.width = 'auto'; okBtn.style.marginTop = '0';
+
+        btnContainer.appendChild(cancelBtn); btnContainer.appendChild(okBtn);
+        modal.appendChild(btnContainer); overlay.appendChild(modal); document.body.appendChild(overlay);
+
+        input.focus();
+
+        const submit = () => { const val = input.value; document.body.removeChild(overlay); resolve(val); };
+        const cancel = () => { document.body.removeChild(overlay); resolve(null); };
+
+        okBtn.onclick = submit; cancelBtn.onclick = cancel;
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') submit(); });
+      });
+    }
+
+    function handleReport() {
+      const action = document.getElementById("reportAction").value;
+      let startDate = document.getElementById("reportStartDate").value;
+      let endDate = document.getElementById("reportEndDate").value;
+      const statusDiv = document.getElementById("reportStatus");
+      const btn = document.getElementById("reportBtn");
+
+      if (action === "CPP_REPORT") {
+          startDate = document.getElementById("quarterSelect").value;
+          endDate = document.getElementById("yearSelect").value;
+      }
+
+      if (!action.startsWith("NTE_") && action !== "CHECK_PO_PAYMENT" && action !== "CPP_REPORT" && (!startDate || !endDate)) {
+        showStatus(statusDiv, "Please select both Start Date and End Date.", "error"); return;
+      }
+
+      if (!action.startsWith("NTE_") && action !== "CHECK_PO_PAYMENT" && action !== "CPP_REPORT" && globalMinDate && globalMaxDate) {
+        let sDate = new Date(startDate).setHours(0,0,0,0);
+        let eDate = new Date(endDate).setHours(0,0,0,0);
+        
+        let minBoundStr = (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") ? globalEwtMinDate : globalMinDate;
+        let maxBoundStr = (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") ? globalEwtMaxDate : globalMaxDate;
+        
+        let minD = new Date(minBoundStr).setHours(0,0,0,0);
+        let maxD = new Date(maxBoundStr).setHours(0,0,0,0);
+        
+        if (sDate < minD || eDate > maxD) {
+          showStatus(statusDiv, "Error: Selected dates must be between " + minBoundStr + " and " + maxBoundStr + ".", "error"); return;
+        }
+        if (sDate > eDate) {
+          showStatus(statusDiv, "Error: Start Date cannot be later than End Date.", "error"); return;
+        }
+      }
+      
+      const isTestMode = document.getElementById("testModeCheckbox").checked;
+      let selectedEntities =[]; let selectedAEs = [];
+     
+      
+      let checkboxes;
+      if (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") {
+          checkboxes = document.querySelectorAll('input[name="ewtEntity"]:checked');
+      } else if (action === "SALES_REPORT_CONSOLIDATED") {
+          checkboxes = document.querySelectorAll('input[name="srEntity"]:checked');
+      } else if (action === "NIGHTLY_NARRA") {
+          checkboxes = document.querySelectorAll('input[name="narraEntity"]:checked');
+      } else {
+          checkboxes = document.querySelectorAll('input[name="salesEntity"]:checked');
+      }
+      
+      checkboxes.forEach(cb => {
+          if (cb.value.includes(",")) {
+              cb.value.split(",").forEach(v => selectedEntities.push(v));
+          } else {
+              selectedEntities.push(cb.value);
+          }
+      });
+      if (selectedEntities.length === 0 && !action.startsWith("NTE_") && action !== "CHECK_PO_PAYMENT") {
+        showStatus(statusDiv, "Please select at least one entity/payor for the Report.", "error"); return;
+      }
+
+      let selectedBanks = [];
+      if (action === "NIGHTLY_NARRA") {
+          document.querySelectorAll('input[name="narraBank"]:checked').forEach(cb => selectedBanks.push(cb.value));
+          if (selectedBanks.length === 0) {
+              showStatus(statusDiv, "Please select at least one Bank for the Report.", "error"); return;
+          }
+      }
+      
+      if (action === "SALES_REPORT_CONSOLIDATED" || action === "UNPAID_DR_AE" || action === "UNPAID_DR_CUST" || action === "UNPAID_DR_OVERDUE" || action === "BUY_SELL_REPORT" || action === "COMMISSION_REPORT" || action === "CPP_REPORT") {
+        const aeCheckboxes = document.querySelectorAll('.ae-item input[name="salesAE"]:checked');
+        aeCheckboxes.forEach(cb => selectedAEs.push(cb.value));
+        if (selectedAEs.length === 0) {
+          showStatus(statusDiv, "Please select at least one Account Executive/Customer.", "error"); return;
+        }
+      }
+
+      showStatus(statusDiv, "Checking system availability...", "loading");
+      btn.disabled = true;
+
+      console.log("[FRONTEND DEBUG] Preparing to call webappRequestUploadLock...");
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          console.log("[FRONTEND DEBUG] Lock Response Received: " + response);
+          if (response === "BUSY" || response === "BUSY_IMPORT") {
+            showStatus(statusDiv, "System is currently busy. Please wait.", "error"); btn.disabled = false; return;
+          }
+          showStatus(statusDiv, "Triggering report batch... Please wait.", "loading");
+          
+          console.log("[FRONTEND DEBUG] Preparing to call webappTriggerReport...");
+          console.log("[FRONTEND DEBUG] Action: " + action);
+          console.log("[FRONTEND DEBUG] Selected Customers Count: " + selectedAEs.length);
+          console.log("[FRONTEND DEBUG] JSON Payload Char Length: " + JSON.stringify(selectedAEs).length);
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              btn.disabled = false;
+              document.getElementById("uploadBtn").disabled = false;
+              if (res.includes("successfully") || res.startsWith("Success")) showStatus(statusDiv, res, "success");
+              else showStatus(statusDiv, res, "error");
+            })
+            .withFailureHandler(function(error) {
+              btn.disabled = false;
+              document.getElementById("uploadBtn").disabled = false;
+              showStatus(statusDiv, "Server Error: " + error.message, "error");
+              google.script.run.webappReleaseUploadLock();
+            })
+            .webappTriggerReport(action, startDate, endDate, selectedEntities, selectedAEs, isTestMode, selectedBanks);
+        })
+        .withFailureHandler(function(error) {
+          showStatus(statusDiv, "Error checking system: " + error.message, "error"); btn.disabled = false;
+        })
+        .webappRequestUploadLock();
+    }
+    
+    function cancelReport() {
+      const statusDiv = document.getElementById("reportStatus");
+      const cancelBtn = document.getElementById("cancelBtn");
+      const reportBtn = document.getElementById("reportBtn");
+      const uploadBtn = document.getElementById("uploadBtn");
+
+      showStatus(statusDiv, "Cancelling all reports and removing system locks... Please wait.", "loading");
+      cancelBtn.disabled = true;
+      if (reportBtn) reportBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          cancelBtn.disabled = false;
+          if (reportBtn) reportBtn.disabled = false;
+          if (uploadBtn) uploadBtn.disabled = false;
+          
+          if (response.startsWith("Success")) showStatus(statusDiv, response, "success");
+          else showStatus(statusDiv, response, "error");
+        })
+        .withFailureHandler(function(error) {
+          cancelBtn.disabled = false;
+          if (reportBtn) reportBtn.disabled = false;
+          if (uploadBtn) uploadBtn.disabled = false;
+          
+          showStatus(statusDiv, "Server Error: " + error.message, "error");
+        })
+        .webappCancelReport(); // Removed parameter, acts as master reset
+    }
+    
+    function showStatus(element, message, type) { element.className = "status " + type; element.innerText = message; }
+
+    function doLogout() {
+      const token = sessionStorage.getItem("pf_session_token");
+      sessionStorage.removeItem("pf_session_token");
+      sessionStorage.removeItem("otp_verified_index"); // Clears the new portal access OTP
+      sessionStorage.removeItem("otp_verified_2307_PINGCON");
+      sessionStorage.removeItem("otp_verified_2307_KEYSYS");
+      sessionStorage.removeItem("otp_verified_2307_A2Z2GO");
+      document.body.innerHTML = "<div style='text-align:center; margin-top:100px; font-family:sans-serif; color:#666;'><h2>Logging out securely...</h2></div>";
+      google.script.run.withSuccessHandler(function(url) {
+         window.top.location.href = url;
+      }).withFailureHandler(function() {
+         window.top.location.href = "<?= ScriptApp.getService().getUrl() ?>";
+      }).getWebAppUrl();
+    }
+  </script>
+</body>
+</html>

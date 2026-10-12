@@ -1,0 +1,145 @@
+
+<!--LOGIN.HTML-->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Portal - Login</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+    .login-card { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; border-top: 5px solid #e81e63; }
+    h2 { margin-top: 0; color: #e81e63; margin-bottom: 20px; }
+    .info-text { color: #5f6368; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+    input[type="text"] { padding: 12px; font-size: 16px; text-align: center; width: 240px; letter-spacing: 2px; border: 1px solid #ccc; border-radius: 4px; outline: none; margin-bottom: 15px; box-sizing: border-box; }
+    .primary-btn { background-color: #e81e63; color: white; border: none; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; width: 240px; transition: 0.3s; margin-bottom: 10px; }
+    .primary-btn:hover { background-color: #c2185b; }
+    .primary-btn:disabled { background-color: #f48fb1; cursor: not-allowed; }
+    .secondary-btn { background-color: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; width: 240px; transition: 0.3s; display: inline-block; }
+    .secondary-btn:hover { background-color: #e8eaed; }
+    #otp-timer { margin-top: 10px; font-size: 14px; font-weight: bold; color: #d93025; display: none; }
+    #otp-msg { margin-top: 15px; font-size: 13px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2>Enterprise Finance<br><span style="font-size: 16px; color: #5f6368; font-weight: normal;">Restricted Access Portal</span></h2>
+    <p class="info-text">An access code is required to open the Reports Generator.<br>The code will be sent to <b><?= SCRIPT_PROPS['ADMIN_EMAIL'] ?></b>.</p>
+    
+    <div id="otp-step-1">
+      <button class="primary-btn" onclick="sendOtp()" id="btn-send-otp">Send Access Code</button>
+    </div>
+    
+    <div id="otp-step-2" style="display:none;">
+      <input type="text" id="otp-input" placeholder="Enter 6-digit code">
+      <br>
+      <button class="primary-btn" onclick="verifyOtp()" id="btn-verify-otp">Verify Code</button>
+      <br>
+      <button class="secondary-btn" onclick="sendOtp()" id="btn-resend-otp" style="display:none;">Resend Code</button>
+    </div>
+    
+    <div id="otp-timer"></div>
+    <div id="otp-msg"></div>
+  </div>
+
+  <script>
+    let otpInterval;
+
+    function startOtpTimer() {
+        clearInterval(otpInterval);
+        let timeLeft = 120; // 2 minutes expiration
+        document.getElementById('otp-timer').style.display = 'block';
+        document.getElementById('btn-resend-otp').style.display = 'none';
+        document.getElementById('btn-verify-otp').disabled = false;
+        
+        otpInterval = setInterval(function() {
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('otp-timer').innerText = 'Code expires in: ' + m + ':' + (s < 10 ? '0' : '') + s;
+            
+            if (timeLeft <= 0) {
+                clearInterval(otpInterval);
+                document.getElementById('otp-timer').style.display = 'none';
+                document.getElementById('otp-msg').style.color = 'red';
+                document.getElementById('otp-msg').innerText = 'The code has expired. Please request a new one.';
+                document.getElementById('btn-verify-otp').disabled = true;
+                document.getElementById('btn-resend-otp').style.display = 'inline-block';
+            }
+        }, 1000);
+    }
+
+    function sendOtp() {
+      document.getElementById('btn-send-otp').innerText = 'Sending...';
+      document.getElementById('btn-send-otp').disabled = true;
+      if (document.getElementById('btn-resend-otp')) {
+          document.getElementById('btn-resend-otp').innerText = 'Sending...';
+          document.getElementById('btn-resend-otp').disabled = true;
+      }
+      document.getElementById('otp-msg').style.color = '#333';
+      document.getElementById('otp-msg').innerText = '';
+      clearInterval(otpInterval);
+      document.getElementById('otp-timer').style.display = 'none';
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           document.getElementById('otp-step-1').style.display = 'none';
+           document.getElementById('otp-step-2').style.display = 'block';
+           document.getElementById('otp-msg').style.color = 'green';
+           document.getElementById('otp-msg').innerText = 'Code sent! Please check <?= SCRIPT_PROPS["ADMIN_EMAIL"] || "your registered admin email" ?>.';
+           if (document.getElementById('btn-resend-otp')) {
+               document.getElementById('btn-resend-otp').innerText = 'Resend Code';
+               document.getElementById('btn-resend-otp').disabled = false;
+           }
+           startOtpTimer();
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-send-otp').innerText = 'Send Access Code';
+           document.getElementById('btn-send-otp').disabled = false;
+           if (document.getElementById('btn-resend-otp')) {
+               document.getElementById('btn-resend-otp').innerText = 'Resend Code';
+               document.getElementById('btn-resend-otp').disabled = false;
+           }
+           document.getElementById('otp-msg').style.color = 'red';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappSendNteOtp('PORTAL_ACCESS', '<?= SCRIPT_PROPS['ADMIN_EMAIL'] ?>');
+    }
+    
+    function verifyOtp() {
+      let code = document.getElementById('otp-input').value;
+      if (!code || code.length < 5) return;
+      
+      document.getElementById('btn-verify-otp').innerText = 'Verifying...';
+      document.getElementById('btn-verify-otp').disabled = true;
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              clearInterval(otpInterval);
+              document.getElementById('otp-msg').style.color = 'green';
+              document.getElementById('otp-msg').innerText = 'Access granted! Loading portal...';
+              sessionStorage.setItem("pf_session_token", res.token);
+              setTimeout(() => {
+                  google.script.run.withSuccessHandler(url => {
+                      window.top.location.href = url;
+                  }).getWebAppUrl();
+              }, 1000);
+           } else {
+              document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+              document.getElementById('btn-verify-otp').disabled = false;
+              document.getElementById('otp-msg').style.color = 'red';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+           document.getElementById('btn-verify-otp').disabled = false;
+           document.getElementById('otp-msg').style.color = 'red';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappVerifyPortalOtp(code);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+
+<!--SHELL.HTML-->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Finance & ERP Portal</title>
+  <style>
+    body { margin:0; padding:0; background-color:#f4f7f6; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: #666; }
+    .spinner { border: 4px solid #e0e0e0; border-top: 4px solid #F50057; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;}
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="app-root">
+    <div class="loader">
+      <div class="spinner"></div>
+      <h2>Securing connection...</h2>
+    </div>
+  </div>
+  <script>
+    const reqPage = "<?= requestedPage ?>";
+    const reqRow = "<?= rowParam ?>";
+    const token = sessionStorage.getItem("pf_session_token") || "";
+    
+    // Asks the server for the page content. If token is invalid, it returns the Login page.
+    google.script.run.withSuccessHandler(function(response) {
+      document.getElementById("app-root").innerHTML = response.html;
+      
+      // Forces injected scripts from INDEX.html or LOGIN.html to execute
+      const scripts = document.getElementById("app-root").querySelectorAll("script");
+      scripts.forEach(oldScript => {
+        const newScript = document.createElement("script");
+        Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+    }).getSecurePage(reqPage, token, reqRow);
+  </script>
+</body>
+</html>

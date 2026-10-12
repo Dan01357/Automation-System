@@ -1,0 +1,3281 @@
+<!--EWT_CLIENT_PORTAL.html-->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EWT Report Client Portal</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+
+  <? 
+    let themePrimary = '#F50057'; 
+    let themeHover = '#C51162';
+    let themeSidebar = '#111c43'; 
+    let themeShadow = 'rgba(245, 0, 87, 0.2)';
+    
+    if (companyContext === 'KEYSYS') {
+        themePrimary = '#660099'; themeHover = '#4b0070'; themeShadow = 'rgba(102, 0, 153, 0.2)';
+    } else if (companyContext === 'A2Z2GO') {
+        themePrimary = '#D50000'; themeHover = '#A30000'; themeShadow = 'rgba(213, 0, 0, 0.2)';
+    }
+  ?>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+    :root {
+      --primary-color: <?= themePrimary ?>;
+      --primary-hover: <?= themeHover ?>;
+      --sidebar-bg: <?= themeSidebar ?>;
+      --shadow-color: <?= themeShadow ?>;
+    }
+    body { font-family: 'Nunito', sans-serif; background-color: #f3f6f9; margin: 0; padding: 0; color: #495057; }
+    .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+    
+    .sidebar { width: 260px; background-color: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: margin-left 0.3s ease; }
+    .sidebar.collapsed { margin-left: -260px; }
+    .sidebar-header { padding: 25px 20px; font-size: 22px; font-weight: 800; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px;}
+    .nav-tabs { display: flex; flex-direction: column; padding: 15px 0; width: 100%; }
+    .nav-tab { padding: 15px 25px; cursor: pointer; font-weight: 600; color: #a3aed1; border-left: 4px solid transparent; transition: 0.3s; font-size: 15px; display: flex; align-items: center; gap: 12px;}
+    .nav-tab:hover { color: #fff; background-color: rgba(255,255,255,0.05); }
+    .nav-tab.active { color: #fff; border-left-color: var(--primary-color); background-color: rgba(255,255,255,0.08); font-weight: 700; }
+
+    .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; background-color: #f3f6f9; }
+    .top-header { background: #fff; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 900; height: 40px;}
+    .menu-toggle-btn { background: transparent; border: none; color: var(--sidebar-bg); cursor: pointer; padding: 6px; margin-right: 15px; transition: 0.2s; }
+    .menu-toggle-btn:hover { background: rgba(17, 28, 67, 0.1); border-radius: 6px;}
+    .content-wrapper { padding: 30px; flex-grow: 1; }
+
+    /* Cards & Buttons */
+    .card { background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.03); border: 1px solid #eef2f7; margin-bottom: 25px; }
+    .primary-btn { background-color: var(--primary-color); color: white; border: none; padding: 12px 25px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: 0.3s; font-family: 'Nunito', sans-serif;}
+    .primary-btn:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-1px); }
+    .primary-btn:disabled { background-color: #a3aed1; cursor: not-allowed; }
+    .secondary-btn { background-color: #fff; color: #495057; border: 1px solid #e2e5ec; padding: 12px 25px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: 0.3s; font-family: 'Nunito', sans-serif;}
+    .secondary-btn:hover:not(:disabled) { background-color: #f8f9fa; color: var(--sidebar-bg); border-color: #d1d7e2; transform: translateY(-1px); }
+    .secondary-btn:disabled { background-color: #f8f9fa; color: #adb5bd; cursor: not-allowed; border-color: #eef2f7; }
+
+    /* Analytics Mini Cards */
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .mini-stat-card { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eef2f7; border-left: 4px solid var(--primary-color); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
+    .mini-stat-info h4 { margin: 0; font-size: 10px; color: #5f6368; text-transform: uppercase; font-weight: 800; }
+    .mini-stat-info h2 { margin: 5px 0 0 0; font-size: 22px; color: var(--sidebar-bg); font-weight: 900; }
+
+    /* Upload Zone */
+    .upload-zone { border: 2px dashed #a3aed1; border-radius: 10px; padding: 40px 20px; text-align: center; background: #f8f9fa; transition: 0.3s; cursor: pointer; }
+    .upload-zone.dragover { border-color: var(--primary-color); background: var(--shadow-color); }
+    /* Split View Editor */
+    .split-view { display: flex; gap: 25px; height: 75vh; }
+    .image-side { flex: 1.2; background: #e0e0e0; border-radius: 8px; border: 1px solid #eef2f7; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 10px rgba(0,0,0,0.05); }
+    .fields-side { flex: 1; overflow-y: auto; padding-right: 10px; }
+    
+    .field-row { display: flex; align-items: center; margin-bottom: 12px; }
+    .field-label { width: 40%; font-size: 12px; font-weight: 700; color: #495057; }
+    .field-input { width: 60%; padding: 10px; border: 1px solid #e2e5ec; border-radius: 6px; font-size: 13px; font-family: 'Nunito', sans-serif; outline: none; transition: 0.3s; background: #f8f9fa; }
+    .field-input:focus { border-color: var(--primary-color); background: #fff; box-shadow: 0 0 0 3px var(--shadow-color); }
+    .required-star { color: #d50000; margin-left: 3px; font-weight: bold; }
+    .input-wrapper { position: relative; width: 60%; display: flex; align-items: center; }
+    .alt-btn { position: absolute; right: 6px; background: #fff; border: 1px solid #e2e5ec; border-radius: 4px; cursor: pointer; padding: 4px 10px; font-weight: bold; color: #8a96a3; z-index: 2; font-size: 11px; }
+    .alt-btn:hover { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+    .alt-dropdown { position: absolute; right: 0; top: 40px; background: white; border: 1px solid #eef2f7; border-radius: 6px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); max-height: 220px; overflow-y: auto; z-index: 100; display: none; min-width: 140px; }
+    .alt-item { padding: 8px 12px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-weight: 700; color: #495057; }
+    .alt-item:hover { background: #f3f6f9; color: var(--primary-color); }
+    .error-highlight { border-color: #d50000 !important; box-shadow: 0 0 0 3px rgba(213,0,0,0.1) !important; background-color: #fffafb !important; }
+    
+    .tax-grid { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eef2f7; margin-top: 15px; }
+    .tax-grid h4 { margin: 0 0 15px 0; font-size: 13px; color: var(--sidebar-bg); border-bottom: 2px solid #e2e5ec; padding-bottom: 8px; }
+
+    .modern-toolbar { display: flex; align-items: center; gap: 4px; background: #2f334a; padding: 6px 12px; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+    .toolbar-btn { background: transparent; border: none; color: #fff; cursor: pointer; padding: 6px; border-radius: 4px; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+    /* Modern Verified Table & Action Styles (Matched with Portal A) */
+    .ewt-action-bar { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 20px; border-radius: 8px 8px 0 0; border: 1px solid #eef2f7; border-bottom: none; flex-wrap: wrap; gap: 15px; }
+    .table-container-modern { border: 1px solid #eef2f7; border-radius: 0; overflow-y: auto; overflow-x: auto; max-height: 550px; background: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.02); }
+    
+    .ewt-pro-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; background: #fff; table-layout: auto; }
+    .ewt-pro-table th { background: #f8f9fa; color: #6b778c; font-weight: 800; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 10px 8px; border-bottom: 2px solid #eef2f7; border-top: 1px solid #eef2f7; position: sticky; top: 0; z-index: 6; text-align: left; }
+    .ewt-pro-table td { padding: 10px 8px; vertical-align: middle; border-bottom: 1px solid #eef2f7; color: #495057; font-weight: 600; }
+    .ewt-pro-table tbody tr:hover { background-color: #fcfcfd; box-shadow: inset 3px 0 0 var(--primary-color); }
+    
+    .sortable { cursor: pointer; user-select: none; transition: 0.2s; }
+    .sortable:hover { color: var(--primary-color); }
+    .sort-icon { display: inline-block; margin-left: 4px; font-size: 10px; color: var(--primary-color); }
+    
+    .ewt-btn { padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-family: 'Nunito', sans-serif; }
+    .ewt-btn-edit { background: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; }
+    .ewt-btn-edit:hover { background: #d2e3fc; transform: translateY(-1px); }
+    .ewt-btn-force { background: #fff0f0; color: #d93025; border: 1px solid #fad2cf; }
+    .ewt-btn-force:hover { background: #fad2cf; transform: translateY(-1px); }
+    .ewt-btn-undo { background: #f1f3f4; color: #5f6368; border: 1px solid #e8eaed; }
+    .ewt-btn-undo:hover { background: #e8eaed; transform: translateY(-1px); }
+
+    .pagination-controls { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: #fff; border: 1px solid #eef2f7; border-top: none; border-radius: 0 0 8px 8px; font-size: 13px; font-weight: 600; color: #8a96a3; }
+    .page-btn { background: #fff; border: 1px solid #e2e5ec; padding: 6px 14px; cursor: pointer; border-radius: 4px; font-weight: 700; color: #495057; transition: 0.2s; font-family: 'Nunito', sans-serif; }
+    .page-btn:hover:not(:disabled) { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+    .page-btn:disabled { color: #adb5bd; cursor: not-allowed; background: #f8f9fa; border-color: #eef2f7; }
+    
+    .ewt-sticky-footer { background: #f8f9fa; border: 1px solid #eef2f7; padding: 15px 25px; margin: 25px 0 0 0; border-radius: 8px; display: flex; justify-content: flex-end; gap: 12px; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+    .toolbar-btn:hover { background: rgba(255,255,255,0.2); }
+    .upload-zone p { color: #5f6368; font-weight: 600; margin-top: 10px; }
+    .date-input, input.date-input, .flatpickr-input { cursor: pointer !important; }
+    /* Tasks Queue Drawer & Header Badge Styles */
+    .header-btn { background: rgba(26, 115, 232, 0.1); color: #1a73e8; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; font-family: 'Nunito', sans-serif; }
+    .header-btn:hover { background: rgba(26, 115, 232, 0.2); transform: translateY(-1px); }
+    .header-badge { background: #d93025; color: white; border-radius: 12px; padding: 3px 8px; font-size: 11px; font-weight: 900; letter-spacing: 0.5px; transition: 0.3s; }
+    .queue-drawer { position: fixed; top: 0; right: -420px; width: 400px; height: 100vh; background: #fff; box-shadow: -5px 0 30px rgba(0,0,0,0.15); z-index: 10000; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; }
+    .queue-drawer.open { right: 0; }
+    .queue-header { padding: 20px 25px; background: var(--sidebar-bg); color: #fff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 2; }
+    .queue-body { flex: 1; overflow-y: auto; padding: 20px; background: #f3f6f9; }
+    .queue-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 28, 67, 0.4); z-index: 9999; backdrop-filter: blur(2px); transition: 0.3s; opacity: 0; }
+    .queue-overlay.show { display: block; opacity: 1; }
+
+    /* ADDED: Global Spinner for Analytics Loading */
+    .loader-spinner {
+      border: 3px solid rgba(0,0,0,0.1);
+      border-left-color: var(--primary-color);
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-top: 5px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    /* Activity Timeline & Filter Styles */
+    .timeline { position: relative; max-width: 100%; margin: 0 auto; padding-left: 20px; }
+    .timeline::after { content: ''; position: absolute; width: 2px; background-color: #eef2f7; top: 0; bottom: 0; left: 6px; margin-left: -1px; }
+    .timeline-item { padding: 10px 20px; position: relative; background-color: inherit; width: 100%; box-sizing: border-box; }
+    .timeline-item::after { content: ''; position: absolute; width: 12px; height: 12px; right: auto; background-color: white; border: 3px solid var(--primary-color); top: 15px; left: 0px; border-radius: 50%; z-index: 1; }
+    .timeline-content { padding: 15px 20px; background-color: #fff; position: relative; border-radius: 8px; border: 1px solid #eef2f7; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+    .timeline-content h3 { margin: 0 0 5px 0; font-size: 14px; color: var(--sidebar-bg); }
+    .timeline-content p { margin: 0; font-size: 13px; color: #5f6368; }
+    .timeline-date { font-size: 11px; font-weight: bold; color: #8a96a3; margin-bottom: 5px; display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- AUTHENTICATION OVERLAY (Individual User Identity & Accountability) -->
+  <div id="otp-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(243, 246, 249, 0.96); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+    <script>
+      (function() {
+        const exp = localStorage.getItem('pf_exp_cli_<?= companyContext ?>');
+        const tok = localStorage.getItem('pf_tok_cli_<?= companyContext ?>');
+        if (tok && exp && Date.now() < parseInt(exp, 10)) {
+          document.getElementById('otp-overlay').style.display = 'none';
+        }
+      })();
+    </script>
+    <div style="background:#fff; padding:40px 30px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); border:1px solid #eef2f7; text-align:center; max-width:420px; width:90%;">
+      
+      <div style="background:var(--shadow-color); width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+
+      <h2 style="margin-top:0; color:var(--primary-color); font-weight:800; font-family:'Nunito', sans-serif;">Security Verification</h2>
+      <p style="color:#8a96a3; font-size:14px; font-weight:600; margin-bottom: 20px;">Please enter your company work email to access the <strong>EWT Report Client (<?= companyContext ?>)</strong>.</p>
+      
+      <!-- STEP 1: Enter Work Email -->
+      <div id="otp-step-1">
+        <input type="email" id="user-email-input" placeholder="e.g. yourname@company.com" style="padding:14px 15px; font-size:14px; font-weight:600; color:var(--sidebar-bg); width:100%; box-sizing:border-box; border:1px solid #e2e5ec; background:#f8f9fa; border-radius:6px; outline:none; transition:0.3s; margin-bottom: 15px;">
+        <button type="button" class="primary-btn" onclick="sendOtp()" id="btn-send-otp" style="margin-top: 0; width: 100%;">Send Access Code</button>
+      </div>
+      
+      <!-- STEP 2: Enter 6-Digit OTP -->
+      <div id="otp-step-2" style="display:none;">
+        <div id="otp-target-email" style="font-size: 13px; color: #5f6368; font-weight: bold; margin-bottom: 12px;"></div>
+        <input type="text" id="otp-input" placeholder="Enter 6-digit code" maxlength="6" style="padding:15px; font-size:22px; font-weight:bold; color:var(--sidebar-bg); text-align:center; width:100%; box-sizing:border-box; letter-spacing:6px; border:1px solid #e2e5ec; background:#f8f9fa; border-radius:6px; outline:none; transition:0.3s;" onfocus="this.style.borderColor='var(--primary-color)'; this.style.backgroundColor='#fff';">
+        <button type="button" class="primary-btn" onclick="verifyOtp()" id="btn-verify-otp" style="margin-top:15px; width:100%;">Verify Code</button>
+        <button type="button" class="secondary-btn" onclick="sendOtp()" id="btn-resend-otp" style="margin-top:10px; width:100%; display:none;">Resend Code</button>
+      </div>
+
+      <div id="otp-timer" style="margin-top:15px; font-size:13px; font-weight:bold; color:#ea4335; display:none;"></div>
+      <div id="otp-msg" style="margin-top:15px; font-size:13px; font-weight:bold;"></div>
+    </div>
+  </div>
+
+  <script>
+    let otpInterval;
+
+    const PORTAL_KEY_CLI_TOK = 'pf_tok_cli_<?= companyContext ?>';
+    const PORTAL_KEY_CLI_USR = 'pf_usr_cli_<?= companyContext ?>';
+    const PORTAL_KEY_CLI_EXP = 'pf_exp_cli_<?= companyContext ?>';
+
+    function initClientPortalSession() {
+      const exp = localStorage.getItem(PORTAL_KEY_CLI_EXP);
+      const tok = localStorage.getItem(PORTAL_KEY_CLI_TOK);
+      const userStr = localStorage.getItem(PORTAL_KEY_CLI_USR);
+
+      if (tok && userStr && exp && Date.now() < parseInt(exp, 10)) {
+        try {
+          const user = JSON.parse(userStr);
+          sessionStorage.setItem('pf_user_token', tok);
+          sessionStorage.setItem('pf_user_data', userStr);
+          
+          const overlay = document.getElementById('otp-overlay');
+          if (overlay) overlay.style.display = 'none';
+          updateHeaderUserProfile(user);
+          return true;
+        } catch (e) {}
+      } else {
+        localStorage.removeItem(PORTAL_KEY_CLI_TOK);
+        localStorage.removeItem(PORTAL_KEY_CLI_USR);
+        localStorage.removeItem(PORTAL_KEY_CLI_EXP);
+        sessionStorage.removeItem('pf_user_token');
+        sessionStorage.removeItem('pf_user_data');
+        const overlay = document.getElementById('otp-overlay');
+        if (overlay) overlay.style.display = 'flex';
+      }
+      return false;
+    }
+
+    initClientPortalSession();
+
+    function updateHeaderUserProfile(user) {
+      const badge = document.getElementById('header-user-display');
+      if (badge && user) {
+        badge.innerHTML = `👤 <strong>${user.name}</strong> <span style="color:#8a96a3; font-weight:normal; font-size:12px;">(${user.role})</span>`;
+        document.getElementById('header-user-badge').style.display = 'flex';
+
+        const delLogsBtn = document.getElementById('btn-delete-client-logs-trigger');
+        if (delLogsBtn) {
+          delLogsBtn.style.display = (user.role === 'Super Admin') ? 'flex' : 'none';
+        }
+
+        const userMgmtTab = document.getElementById('tab-user-mgmt');
+        if (userMgmtTab) {
+          userMgmtTab.style.display = (user.role === 'Super Admin') ? 'flex' : 'none';
+        }
+
+        // Hide Upload Certificates tab from Viewers
+        const uploadTab = document.getElementById('tab-upload');
+        if (uploadTab) {
+          uploadTab.style.display = (user.role === 'Viewer') ? 'none' : 'flex';
+        }
+      }
+    }
+
+    function resetOtpModal() {
+      clearInterval(otpInterval);
+      const timerEl = document.getElementById('otp-timer');
+      if (timerEl) { timerEl.style.display = 'none'; timerEl.innerText = ''; }
+
+      const step1 = document.getElementById('otp-step-1');
+      const step2 = document.getElementById('otp-step-2');
+      if (step1) step1.style.display = 'block';
+      if (step2) step2.style.display = 'none';
+
+      const emailInp = document.getElementById('user-email-input');
+      const otpInp = document.getElementById('otp-input');
+      if (emailInp) emailInp.value = '';
+      if (otpInp) otpInp.value = '';
+
+      const btnSend = document.getElementById('btn-send-otp');
+      if (btnSend) { btnSend.innerText = 'Send Access Code'; btnSend.disabled = false; }
+
+      const btnVerify = document.getElementById('btn-verify-otp');
+      if (btnVerify) { btnVerify.innerText = 'Verify Code'; btnVerify.disabled = false; }
+
+      const btnResend = document.getElementById('btn-resend-otp');
+      if (btnResend) { btnResend.innerText = 'Resend Code'; btnResend.disabled = false; btnResend.style.display = 'none'; }
+
+      const msgEl = document.getElementById('otp-msg');
+      if (msgEl) msgEl.innerText = '';
+    }
+
+    function handleLogout() {
+      const token = localStorage.getItem(PORTAL_KEY_CLI_TOK) || sessionStorage.getItem('pf_user_token');
+      
+      // 1. Wipe all storage and tokens
+      localStorage.removeItem(PORTAL_KEY_CLI_TOK);
+      localStorage.removeItem(PORTAL_KEY_CLI_USR);
+      localStorage.removeItem(PORTAL_KEY_CLI_EXP);
+      sessionStorage.clear();
+
+      if (token) {
+        google.script.run.webappLogoutUser(token);
+      }
+
+      // 2. DEEP MEMORY PURGE: Wipe all queues, cache, and canvas data
+      window.dbCache = [];
+      window.userMgmtCache = null;
+      window.activityLogsCache = null;
+      window.clientEwtPreviewData = null;
+      window.verificationQueue = [];
+      window.uploadedFileBytes = {};
+      window.pdfDocCache = {};
+      window.hasLoadedData = false;
+
+      // 3. Reset UI Elements and hide sensitive tabs
+      const badge = document.getElementById('header-user-badge');
+      if (badge) badge.style.display = 'none';
+      const userMgmtTab = document.getElementById('tab-user-mgmt');
+      if (userMgmtTab) userMgmtTab.style.display = 'none';
+
+      // Clear all table bodies
+      ['db-tbody', 'user-mgmt-tbody', 'ewt-client-tbody'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+      });
+
+      switchTab('overview');
+
+      // 4. Reset Login Pop-up to a 100% clean state
+      resetOtpModal();
+      document.getElementById('otp-overlay').style.display = 'flex';
+    }
+
+    function startOtpTimer() {
+        clearInterval(otpInterval);
+        let timeLeft = 120; // 2 minutes expiration
+        document.getElementById('otp-timer').style.display = 'block';
+        document.getElementById('btn-resend-otp').style.display = 'none';
+        document.getElementById('btn-verify-otp').disabled = false;
+        
+        otpInterval = setInterval(function() {
+            timeLeft--;
+            let m = Math.floor(timeLeft / 60);
+            let s = timeLeft % 60;
+            document.getElementById('otp-timer').innerText = 'Code expires in: ' + m + ':' + (s < 10 ? '0' : '') + s;
+            
+            if (timeLeft <= 0) {
+                clearInterval(otpInterval);
+                document.getElementById('otp-timer').style.display = 'none';
+                document.getElementById('otp-msg').style.color = '#ea4335';
+                document.getElementById('otp-msg').innerText = 'The code has expired. Please request a new one.';
+                document.getElementById('btn-verify-otp').disabled = true;
+                document.getElementById('btn-resend-otp').style.display = 'inline-block';
+            }
+        }, 1000);
+    }
+
+    function sendOtp() {
+      const emailInput = document.getElementById('user-email-input');
+      const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+      
+      if (!email || !email.includes('@')) {
+        document.getElementById('otp-msg').style.color = '#ea4335';
+        document.getElementById('otp-msg').innerText = 'Please enter a valid company work email.';
+        return;
+      }
+
+      document.getElementById('btn-send-otp').innerText = 'Checking HR Record...';
+      document.getElementById('btn-send-otp').disabled = true;
+      document.getElementById('otp-msg').innerText = '';
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              document.getElementById('otp-step-1').style.display = 'none';
+              document.getElementById('otp-step-2').style.display = 'block';
+              document.getElementById('otp-target-email').innerText = 'Code sent to: ' + email;
+              document.getElementById('otp-msg').style.color = '#1e7e34';
+              document.getElementById('otp-msg').innerText = res.message;
+
+              // Reset the Verify button so it is fresh and clickable
+              const btnVerify = document.getElementById('btn-verify-otp');
+              if (btnVerify) { btnVerify.innerText = 'Verify Code'; btnVerify.disabled = false; }
+
+              startOtpTimer();
+           } else {
+              document.getElementById('btn-send-otp').innerText = 'Send Access Code';
+              document.getElementById('btn-send-otp').disabled = false;
+              document.getElementById('otp-msg').style.color = '#ea4335';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-send-otp').innerText = 'Send Access Code';
+           document.getElementById('btn-send-otp').disabled = false;
+           document.getElementById('otp-msg').style.color = '#ea4335';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappSendUserOtp(email, 'EWT Client Portal (<?= companyContext ?>)', 'CLIENT');
+    }
+    
+    function verifyOtp() {
+      const email = document.getElementById('user-email-input').value.trim().toLowerCase();
+      const code = document.getElementById('otp-input').value.trim();
+      if (!code || code.length < 5) return;
+      
+      document.getElementById('btn-verify-otp').innerText = 'Verifying...';
+      document.getElementById('btn-verify-otp').disabled = true;
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              clearInterval(otpInterval);
+              const sixHoursMs = 6 * 60 * 60 * 1000;
+              const expTime = (Date.now() + sixHoursMs).toString();
+
+              localStorage.setItem(PORTAL_KEY_CLI_TOK, res.token);
+              localStorage.setItem(PORTAL_KEY_CLI_USR, JSON.stringify(res.user));
+              localStorage.setItem(PORTAL_KEY_CLI_EXP, expTime);
+
+              sessionStorage.setItem('pf_user_token', res.token);
+              sessionStorage.setItem('pf_user_data', JSON.stringify(res.user));
+
+              document.getElementById('otp-overlay').style.display = 'none';
+              updateHeaderUserProfile(res.user);
+           } else {
+              document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+              document.getElementById('btn-verify-otp').disabled = false;
+              document.getElementById('otp-msg').style.color = '#ea4335';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           document.getElementById('btn-verify-otp').innerText = 'Verify Code';
+           document.getElementById('btn-verify-otp').disabled = false;
+           document.getElementById('otp-msg').style.color = '#ea4335';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappVerifyUserOtp(email, code, 'CLIENT');
+    }
+  </script>
+
+  <div class="app-container">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <? let displayTitle = companyContext === 'PINGCON' ? 'Pingcon' : (companyContext === 'KEYSYS' ? 'Keysys' : (companyContext === 'BONITA' ? 'Bonita' : 'A2Z2GO')); ?>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span><?= displayTitle ?> EWT Client</span>
+      </div>
+      
+      <div class="nav-tabs">
+        <div id="tab-overview" class="nav-tab active" onclick="switchTab('overview')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg> Overview Dashboard
+        </div>
+        <div id="tab-database" class="nav-tab" onclick="switchTab('database')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg> Verified 2307 Archive
+        </div>
+        <div id="tab-upload" class="nav-tab" onclick="switchTab('upload')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Upload Certificates
+        </div>
+        <div id="tab-queue" class="nav-tab" onclick="switchTab('queue')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg> Pending Verification
+        </div>
+        <div id="tab-report" class="nav-tab" onclick="switchTab('report')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Client 2307 Report
+        </div>
+        <div id="tab-activity" class="nav-tab" onclick="switchTab('activity')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> Audit Logs
+        </div>
+        <div id="tab-user-mgmt" class="nav-tab" onclick="switchTab('user-mgmt')" style="display:none;">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> User Management
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <header class="top-header">
+         <div style="display: flex; align-items: center;">
+           <button class="menu-toggle-btn" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')">
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+           </button>
+           <h3 style="margin:0; color:#111c43; font-weight:800;">EWT Report Client Portal</h3>
+         </div>
+         <!-- User Profile & Accountability Badge -->
+         <div id="header-user-badge" style="display:none; align-items:center; gap:12px; margin-right:20px;">
+            <span id="header-user-display" style="font-size:13px; font-weight:800; color:var(--sidebar-bg);"></span>
+            <button type="button" onclick="handleLogout()" class="secondary-btn" style="padding:5px 12px; font-size:11.5px; margin:0; border-radius:15px; border-color:#dcdfe6; color:#5f6368;" title="Sign out of current account">Logout</button>
+         </div>
+         <!-- Tasks Header Button -->
+         <button class="header-btn" id="header-queue-btn" onclick="toggleQueueDrawer()">
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+             Tasks Queue
+             <span class="header-badge" id="header-q-badge" style="display:none;">0</span>
+         </button>
+      </header>
+      
+      <div class="content-wrapper">
+        
+        <!-- SECTION: ANALYTICS OVERVIEW -->
+        <div id="sec-overview" class="card" style="display:block;">
+          <h3 style="margin-top:0; color:var(--sidebar-bg); font-weight: 800;">Analytics Overview</h3>
+          <div class="overview-grid">
+            <div class="mini-stat-card">
+              <div class="mini-stat-info"><h4>Verified 2307s</h4><h2 id="stat-count"><div class="loader-spinner"></div></h2></div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-info"><h4>Total Income Payments</h4><h2 id="stat-income"><div class="loader-spinner"></div></h2></div>
+            </div>
+            <div class="mini-stat-card">
+              <div class="mini-stat-info"><h4>Total Tax Withheld</h4><h2 id="stat-tax"><div class="loader-spinner"></div></h2></div>
+            </div>
+          </div>
+          <div style="height: 300px; position: relative;">
+            <canvas id="clientChart"></canvas>
+          </div>
+        </div>
+
+        <!-- SECTION: UPLOAD -->
+        <div id="sec-upload" class="card" style="display:none;">
+          <h3 style="margin-top:0; color:var(--sidebar-bg); font-weight: 800;">Upload Client 2307s</h3>
+          <p style="font-size:14px; color:#8a96a3;">Upload the physical 2307 PDFs sent by your clients. The system will use OCR to read them.</p>
+          
+          <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--primary-color);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <p>Click here or drag and drop PDFs</p>
+            <input type="file" id="file-input" multiple accept="application/pdf, image/*" style="display:none;" onchange="handleFileSelect(event)">
+          </div>
+          
+          <div id="file-list" style="margin-top: 15px; font-size:13px; color:#495057;"></div>
+          <button class="primary-btn" id="btn-upload" style="margin-top:15px; display:none;" onclick="startUpload()">Upload & Process Files</button>
+        </div>
+
+        <!-- SECTION: VERIFICATION QUEUE -->
+        <div id="sec-queue" class="card" style="display:none; padding: 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+             <div style="display:flex; align-items:center; flex: 1; overflow: hidden; padding-right: 15px;">
+                 <!-- Hidden counter to prevent Javascript from crashing -->
+                 <span id="queue-count" style="display:none;">0</span>
+                 <!-- Filename will now truncate with "..." if it's too long to prevent layout breaking -->
+                 <span id="queue-filename" style="font-weight:bold; font-size:16px; color:var(--primary-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+             </div>
+             
+             <!-- TOOLBAR MOVED HERE (Above Image, Right-Aligned) -->
+             <div class="modern-toolbar" id="top-toolbar" style="display:none; flex-shrink: 0;">
+               <button class="toolbar-btn" onclick="changeQueueItem(-1)" title="Previous File">❮</button>
+               <span id="page-indicator" style="color:white; font-size:13px; font-weight:bold; margin:0 8px;">1 / 1</span>
+               <button class="toolbar-btn" onclick="changeQueueItem(1)" title="Next File">❯</button>
+               <div style="width:1px; height:18px; background:rgba(255,255,255,0.3); margin:0 5px;"></div>
+               <button class="toolbar-btn" onclick="changeZoom(0.2)" title="Zoom In">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+               </button>
+               <button class="toolbar-btn" onclick="changeZoom(-0.2)" title="Zoom Out">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+               </button>
+               <div style="width:1px; height:18px; background:rgba(255,255,255,0.3); margin:0 5px;"></div>
+               <button class="toolbar-btn" onclick="rotateImage()" title="Rotate">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.13 15.57a10 10 0 1 0 3.43-8.83L21.5 8"></path></svg>
+               </button>
+               <button class="toolbar-btn" onclick="resetZoom()" title="Reset">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+               </button>
+             </div>
+          </div>
+
+          <div id="queue-empty-msg" style="text-align:center; padding:50px; color:#8a96a3; font-weight:bold; display:block;">
+             No files currently in the queue. Please upload PDFs first.
+          </div>
+
+          <div id="split-view-container" class="split-view" style="display:none;">
+             <!-- Left: Image Viewer (PDF.js In-Memory Canvas Engine) -->
+             <div class="image-side" id="pdf-canvas-container" style="position:relative; width:100%; height:100%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#525659;">
+                <div id="img-loader" style="position:absolute; color:#fff; background:rgba(0,0,0,0.7); padding:8px 16px; border-radius:20px; font-weight:bold; font-size:12px; z-index:10; display:none;">Rendering Page...</div>
+                <div id="pdf-viewport-wrapper" style="transform-origin: center center; transition: transform 0.1s ease-out; cursor: grab; display:flex; align-items:center; justify-content:center;">
+                   <canvas id="pdf-preview-canvas" style="max-width:100%; max-height:100%; box-shadow:0 4px 15px rgba(0,0,0,0.3); background:#fff;"></canvas>
+                </div>
+             </div>
+
+             <!-- Right: Form Fields -->
+             <div class="fields-side">
+                <div style="font-size: 11px; color: #8a96a3; margin-bottom: 15px;"><span class="required-star">*</span> Required fields</div>
+                
+                <div class="field-row"><div class="field-label">Date From (MM/DD/YYYY)<span class="required-star">*</span></div><input type="text" id="f_dateFrom" class="field-input date-input" placeholder="MM/DD/YYYY"></div>
+                <div class="field-row"><div class="field-label">Date To (MM/DD/YYYY)<span class="required-star">*</span></div><input type="text" id="f_dateTo" class="field-input date-input" placeholder="MM/DD/YYYY"></div>
+                <div class="field-row"><div class="field-label">SI No.<span class="required-star">*</span></div><input type="text" id="f_siNo" class="field-input"></div>
+                <div class="field-row"><div class="field-label">Customer Name<span class="required-star">*</span></div><input type="text" id="f_customer" class="field-input"></div>
+                <div class="field-row"><div class="field-label">TIN<span class="required-star">*</span></div><input type="text" id="f_tin" class="field-input" onblur="formatTinField(this)"></div>
+                <div class="field-row"><div class="field-label">Address<span class="required-star">*</span></div><input type="text" id="f_address" class="field-input"></div>
+                <div class="field-row"><div class="field-label">Income Payment (Base)<span class="required-star">*</span></div><input type="text" id="f_income" class="field-input" onblur="formatDecimalField(this)"></div>
+                <div class="field-row">
+  <div class="field-label">ATC Code<span class="required-star">*</span></div>
+  <div class="input-wrapper">
+    <input type="text" id="f_atc" class="field-input" placeholder="e.g. WC158" style="width:100%; font-weight:bold; background:#fff;" oninput="handleAtcChange(this.value)">
+    <button type="button" class="alt-btn" onclick="toggleAtcDropdown(event)" title="Choose ATC">⏷</button>
+    <div id="atc_dropdown" class="alt-dropdown">
+      <div class="alt-item" onclick="selectAtcOption('WC158')">WC158 (1%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WC160')">WC160 (2%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WC157')">WC157 (2%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WC120')">WC120 (2%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WC640')">WC640 (1%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WC690')">WC690 (1%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WV010')">WV010 (5%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WV020')">WV020 (5%)</div>
+      <div class="alt-item" onclick="selectAtcOption('WI632')">WI632 (1%)</div>
+    </div>
+  </div>
+</div>
+
+                <div class="tax-grid">
+                   <h4>Tax Withheld Grid (Amounts)<span class="required-star">*</span> <span style="font-size:10px; font-weight:normal; color:#8a96a3;">(At least 1 required)</span></h4>
+                   <div class="field-row"><div class="field-label">WC 158 1%</div><input type="text" id="f_wc158" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WC 160 2%</div><input type="text" id="f_wc160" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WC 157 2%</div><input type="text" id="f_wc157" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WC 120 2%</div><input type="text" id="f_wc120" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WC 640 1%</div><input type="text" id="f_wc640" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WC 690</div><input type="text" id="f_wc690" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WV 010 5%</div><input type="text" id="f_wv010" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WV 020 5%</div><input type="text" id="f_wv020" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                   <div class="field-row"><div class="field-label">WI 632 1%</div><input type="text" id="f_wi632" class="field-input tax-input" onblur="formatDecimalField(this)"></div>
+                </div>
+
+                <div class="field-row" style="margin-top: 15px;">
+                  <div class="field-label">2307 Receive Date (MM/DD/YYYY)<span class="required-star">*</span></div>
+                  <input type="text" id="f_receiveDate" class="field-input date-input" placeholder="MM/DD/YYYY" style="cursor:pointer; background:#fff;">
+                </div>
+
+                <div style="display:flex; gap:8px; margin-top:20px; align-items:center; flex-wrap:wrap;">
+  <button type="button" class="secondary-btn" id="btn-abort-queue" onclick="openAbortModal()" style="flex:1; min-width:105px; padding:12px 8px; font-size:12.5px; margin:0; border-color:#dcdfe6; color:#5f6368;" title="Abort remaining certificates in this batch">✕ Abort Batch</button>
+  <button type="button" class="secondary-btn" id="btn-reset-page" onclick="resetCurrentPage()" style="flex:1; min-width:105px; padding:12px 8px; font-size:12.5px; margin:0; border-color:#dcdfe6; color:#1a73e8;" title="Revert edits on this page and restore AI values">↺ Reset Page</button>
+  <button type="button" class="primary-btn" id="btn-skip-cert" onclick="openSkipModal()" style="flex:1.2; min-width:125px; padding:12px 8px; font-size:12.5px; margin:0; background-color:#f29900; color:#fff; border:none;" title="Skip this page without saving">⚠️ Skip Certificate</button>
+  <button type="button" class="primary-btn" id="btn-save-next" onclick="saveAndNextItem()" style="flex:1.8; min-width:160px; padding:12px 8px; font-size:13.5px; margin:0;" title="Save and go to next (Ctrl + Enter)">💾 Confirm & Load Next</button>
+</div>
+             </div>
+          </div>
+        </div>
+        <!-- MODAL: ABORT BATCH CONFIRMATION -->
+        <div id="abort-batch-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
+          <div style="background:#fff; width:90%; max-width:480px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.2); overflow:hidden; border:1px solid #eef2f7;">
+            <div style="background:#fce8e6; padding:18px 25px; border-bottom:1px solid #fad2cf; display:flex; align-items:center; gap:10px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              <h3 style="margin:0; color:#c5221f; font-size:17px; font-weight:800;">Abort Batch Review?</h3>
+            </div>
+            <div style="padding:22px 25px; font-size:14px; color:#495057; line-height:1.6;">
+              <p id="abort-modal-summary" style="margin:0 0 12px 0;">Are you sure you want to abort reviewing this batch?</p>
+              <div style="background:#f8f9fa; border-left:4px solid #d93025; padding:10px 14px; border-radius:4px; font-size:12.5px; color:#5f6368;">
+                <strong>Note:</strong> All previously confirmed certificates are already safely stored in the database. Only unverified pages remaining in this batch will be removed from queue memory.
+              </div>
+            </div>
+            <div style="padding:15px 25px; border-top:1px solid #eef2f7; background:#fcfcfd; display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="secondary-btn" onclick="closeAbortModal()" style="padding:9px 18px; margin:0; font-size:13px;">Keep Reviewing</button>
+              <button type="button" class="primary-btn" onclick="executeAbortBatch()" style="padding:9px 20px; margin:0; width:auto; font-size:13px; background-color:#d93025; color:#fff; border:none;">Confirm Abort</button>
+            </div>
+          </div>
+        </div>
+        <!-- DELETE LOGS MODAL (MATCHED EXACTLY WITH 2307 PORTAL) -->
+        <div id="delete-logs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center;">
+          <div style="background:#fff; width:90%; max-width:450px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); overflow:hidden;">
+              <div style="background:#f8f9fa; padding:15px 20px; border-bottom:1px solid #ddd;">
+                  <h3 style="margin:0; color:#d93025; font-size:16px; font-weight:800;">⚠️ Delete Activity Logs</h3>
+              </div>
+              <div style="padding:20px; font-size:14px; color:#3c4043; line-height:1.5;">
+                  <p style="margin:0 0 15px 0;">Select the date range of the logs you wish to <strong>permanently delete</strong>.</p>
+                  <div style="display:flex; gap:12px; margin-top: 15px;">
+                      <div style="flex:1;">
+                          <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">Start Date</label>
+                          <input type="text" id="delModalStartDate" class="date-input" placeholder="MM/DD/YYYY" style="width:100%; box-sizing:border-box; height:38px; padding:8px 12px; border:1px solid #e2e5ec; border-radius:6px; font-size:13px; background:#fff; font-family:'Nunito',sans-serif; outline:none;">
+                      </div>
+                      <div style="flex:1;">
+                          <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">End Date</label>
+                          <input type="text" id="delModalEndDate" class="date-input" placeholder="MM/DD/YYYY" style="width:100%; box-sizing:border-box; height:38px; padding:8px 12px; border:1px solid #e2e5ec; border-radius:6px; font-size:13px; background:#fff; font-family:'Nunito',sans-serif; outline:none;">
+                      </div>
+                  </div>
+              </div>
+              <div style="padding:15px 20px; border-top:1px solid #ddd; background:#f8f9fa; display:flex; justify-content:flex-end; gap:10px;">
+                  <button type="button" class="secondary-btn" onclick="closeDeleteLogsModal()" style="padding:8px 16px; margin:0; font-size:13px;">Cancel</button>
+                  <button type="button" class="primary-btn" id="confirmDeleteLogsBtn" onclick="deleteActivityLogs()" style="padding:8px 16px; margin:0; width:auto; font-size:13px; background-color:#d93025; border:none; color:#fff;">Confirm Delete</button>
+              </div>
+          </div>
+        </div>
+        <!-- MODAL: SKIP CERTIFICATE CONFIRMATION -->
+        <div id="skip-confirm-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter: blur(2px);">
+          <div style="background:#fff; width:90%; max-width:460px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,0.2); overflow:hidden; border:1px solid #eef2f7;">
+            <div style="background:#fff8e1; padding:18px 25px; border-bottom:1px solid #ffeeba; display:flex; align-items:center; gap:10px;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f29900" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <h3 style="margin:0; color:#856404; font-size:17px; font-weight:800;">Skip Certificate Confirmation</h3>
+            </div>
+            <div style="padding:22px 25px; font-size:14px; color:#495057; line-height:1.6;">
+              <p style="margin:0 0 12px 0;">Are you sure you want to skip <strong id="skip-modal-target" style="color:var(--primary-color);">this certificate</strong>?</p>
+              <div style="background:#f8f9fa; border-left:4px solid #f29900; padding:10px 14px; border-radius:4px; font-size:12.5px; color:#5f6368;">
+                This certificate will <strong>not</strong> be saved to the database. An audit entry will be recorded in the system Activity Log.
+              </div>
+            </div>
+            <div style="padding:15px 25px; border-top:1px solid #eef2f7; background:#fcfcfd; display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="secondary-btn" onclick="closeSkipModal()" style="padding:9px 18px; margin:0; font-size:13px;">Cancel</button>
+              <button type="button" class="primary-btn" id="btn-confirm-skip-exec" onclick="executeSkipCertificate()" style="padding:9px 20px; margin:0; width:auto; font-size:13px; background-color:#f29900; color:#fff; border:none;">Confirm Skip</button>
+            </div>
+          </div>
+        </div>
+        <!-- SECTION: DATABASE (MATCHED WITH 2307 & PURCHASES PORTAL) -->
+        <div id="sec-database" class="card" style="display:none; padding: 20px;">
+          <div class="ewt-action-bar" style="border-radius: 8px 8px 0 0;">
+            <div>
+              <h3 style="margin:0; color:var(--sidebar-bg); font-weight:800; font-size:18px;">Verified Database</h3>
+              <p style="margin:4px 0 0 0; font-size:12px; color:#8a96a3;">Manage, search, sort, and edit historically verified 2307 records.</p>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <button class="secondary-btn" onclick="loadDatabaseData()" style="padding:8px 14px; margin:0; font-size:12px; display:flex; align-items:center; gap:6px;" title="Reload database from server">
+                <span>↻</span> Refresh
+              </button>
+              <input type="text" id="db-search-input" class="field-input" placeholder="Search anywhere..." onkeyup="filterDatabase()" autocomplete="off" style="width:240px; height:36px; padding:6px 12px; font-size:13px; margin:0; background:#fff;">
+              <div style="font-size:12.5px; font-weight:bold; color:#5f6368; display:flex; align-items:center; gap:5px;">
+                <label for="dbRowsPerPage">Show: </label>
+                <select id="dbRowsPerPage" onchange="changeDbRowsPerPage()" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; cursor:pointer; font-family:'Nunito',sans-serif; font-size:12px;">
+                  <option value="5">5</option>
+                  <option value="10" selected>10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="db-loader" style="padding:30px; text-align:center; color:#1a73e8; font-weight:bold; display:none; background:#fff; border:1px solid #eef2f7; border-top:none;">
+            <div class="loader-spinner" style="margin-right:10px;"></div> Loading verified client records...
+          </div>
+
+          <div class="table-container-modern" id="db-table-container">
+            <table class="ewt-pro-table" id="db-table">
+              <thead>
+                <tr>
+                  <th class="text-center sortable" onclick="sortDatabase('sn')" style="width:50px;">SN <span class="sort-icon" id="sort-db-sn"></span></th>
+                  <th class="sortable" onclick="sortDatabase('siNo')" style="width:110px;">SI No. <span class="sort-icon" id="sort-db-siNo"></span></th>
+                  <th class="sortable" onclick="sortDatabase('customerName')">Customer Name <span class="sort-icon" id="sort-db-customerName"></span></th>
+                  <th class="sortable" onclick="sortDatabase('tin')" style="width:130px;">TIN <span class="sort-icon" id="sort-db-tin"></span></th>
+                  <th class="sortable" onclick="sortDatabase('dateFrom')" style="width:145px;">Date From (MM/DD/YYYY) <span class="sort-icon" id="sort-db-dateFrom"></span></th>
+                  <th class="sortable" onclick="sortDatabase('dateTo')" style="width:145px;">Date To (MM/DD/YYYY) <span class="sort-icon" id="sort-db-dateTo"></span></th>
+                  <th class="sortable" onclick="sortDatabase('incomePayment')" style="text-align:right; width:130px;">Income Payment <span class="sort-icon" id="sort-db-incomePayment"></span></th>
+                  <th class="text-center sortable" onclick="sortDatabase('atc')" style="width:70px;">ATC <span class="sort-icon" id="sort-db-atc"></span></th>
+                  <th class="text-center sortable" onclick="sortDatabase('timestamp')" style="width:165px;">Verified On (MM/DD/YYYY) <span class="sort-icon" id="sort-db-timestamp"></span></th>
+                  <th class="text-center" style="width:130px; min-width:130px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="db-tbody">
+                <tr><td colspan="10" style="text-align:center; padding:30px; color:#8a96a3;">No records loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-controls" id="db-pagination" style="display:none;">
+            <span id="db-page-info" style="color:#5f6368;"></span>
+            <div style="display:flex; gap:8px;">
+              <button class="page-btn" id="db-prev-btn" onclick="changeDbPage(-1)">Previous</button>
+              <button class="page-btn" id="db-next-btn" onclick="changeDbPage(1)">Next</button>
+            </div>
+          </div>
+
+          <!-- STICKY BOTTOM ACTIONS FOR BATCH DELETION -->
+          <div class="ewt-sticky-footer" id="db-footer-actions" style="display:none;">
+            <button type="button" class="secondary-btn" id="cancelDbDeleteBtn" onclick="cancelDatabaseDeletions()" style="padding:10px 20px; margin:0; border-radius:6px;">Cancel</button>
+            <button type="button" class="primary-btn" id="saveDbDeleteBtn" onclick="commitDatabaseDeletions()" style="background-color:#d93025; color:#fff; width:auto; padding:10px 20px; margin:0; border-radius:6px;">Delete Selected (0)</button>
+          </div>
+        </div>
+
+        <!-- SECTION: GENERATE EWT REPORT (MATCHED WITH PURCHASE REPORT WORKFLOW) -->
+        <div id="sec-report" class="card" style="display:none; width: 100%; max-width: 100%; box-sizing: border-box; margin: 0 0 25px 0; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.03); border: 1px solid #eef2f7;">
+          <h3 style="margin-top:0; color:var(--sidebar-bg); font-weight: 800;">Generate EWT Client Report</h3>
+          
+          <div style="background: #f8f9fa; padding: 18px 20px; border-radius: 8px; border: 1px solid #eef2f7; margin-bottom: 20px;">
+            <p style="font-size: 13px; color: #5f6368; margin-top: 0; margin-bottom: 15px; font-weight: 600;">Select the 2307 Receive Date range to preview the report before exporting and emailing.</p>
+            
+            <div style="display:flex; gap:12px; margin-bottom:15px; max-width: 500px;">
+              <div style="flex:1;">
+                <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">Start Date (MM/DD/YYYY)</label>
+                <input type="text" id="dl-start-date" class="date-input" placeholder="MM/DD/YYYY" style="width:100%; box-sizing:border-box; height:42px; padding:10px 15px; border:1px solid #e2e5ec; border-radius:6px; font-size:14px; background:#fff; font-family:'Nunito',sans-serif; outline:none; cursor:pointer;">
+              </div>
+              <div style="flex:1;">
+                <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">End Date (MM/DD/YYYY)</label>
+                <input type="text" id="dl-end-date" class="date-input" placeholder="MM/DD/YYYY" style="width:100%; box-sizing:border-box; height:42px; padding:10px 15px; border:1px solid #e2e5ec; border-radius:6px; font-size:14px; background:#fff; font-family:'Nunito',sans-serif; outline:none; cursor:pointer;">
+              </div>
+            </div>
+            
+            <button type="button" class="primary-btn" onclick="previewClientEwtReport()" id="btn-preview-ewt" style="width:auto; margin:0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 22px; font-size: 13.5px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              Preview EWT Report
+            </button>
+          </div>
+
+          <div id="ewtClientStatusDiv" style="font-size: 13.5px; font-weight: bold; margin-bottom: 15px;"></div>
+
+          <!-- INTERACTIVE PREVIEW TABLE -->
+          <div id="ewt-client-table-wrapper" style="display:none;">
+            <div class="ewt-action-bar">
+              <h4 style="margin:0; color:var(--sidebar-bg); font-weight:800; font-size:15px;">Verified Client 2307 Records</h4>
+              <div style="display:flex; align-items:center; gap: 15px;">
+                 <input type="text" id="ewtClientSearchInput" placeholder="Search anywhere..." onkeyup="filterClientEwtTable()" autocomplete="off" style="padding: 7px 12px; height: 35px; box-sizing: border-box; border: 1px solid #e2e5ec; border-radius: 6px; font-size: 13px; font-family: 'Nunito', sans-serif; outline: none; background: #fff; width: 220px;">
+                 <div style="font-size: 12.5px; color: #5f6368; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                   <label for="ewtClientRowsPerPage">Show: </label>
+                   <select id="ewtClientRowsPerPage" onchange="changeClientEwtRows()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; cursor:pointer; font-family:'Nunito',sans-serif; font-size: 12px; background: #fff;">
+                     <option value="5" selected>5</option>
+                     <option value="10">10</option>
+                     <option value="20">20</option>
+                     <option value="50">50</option>
+                   </select>
+                 </div>
+              </div>
+            </div>
+            
+            <div class="table-container-modern" id="ewt-client-container-modern" style="border-top: none; border-radius: 0;">
+              <table class="ewt-pro-table">
+                <thead>
+                  <tr>
+                    <th class="text-center sortable" onclick="sortClientEwtTable(0)" style="width: 50px;">SN <span class="sort-icon" id="sort-ewtc-0"></span></th>
+                    <th class="sortable" onclick="sortClientEwtTable(1)" style="width: 105px;">SI No. <span class="sort-icon" id="sort-ewtc-1"></span></th>
+                    <th class="sortable" onclick="sortClientEwtTable(2)" style="width: 220px;">Customer Name <span class="sort-icon" id="sort-ewtc-2"></span></th>
+                    <th class="sortable" onclick="sortClientEwtTable(3)" style="width: 130px;">TIN <span class="sort-icon" id="sort-ewtc-3"></span></th>
+                    <th class="sortable" onclick="sortClientEwtTable(4)" style="width: 135px;">Date From (MM/DD/YYYY) <span class="sort-icon" id="sort-ewtc-4"></span></th>
+                    <th class="sortable" onclick="sortClientEwtTable(5)" style="width: 135px;">Date To (MM/DD/YYYY) <span class="sort-icon" id="sort-ewtc-5"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(6)" style="width: 140px;">Income Payment <span class="sort-icon" id="sort-ewtc-6"></span></th>
+                    <th class="text-center sortable" onclick="sortClientEwtTable(7)" style="width: 70px;">ATC <span class="sort-icon" id="sort-ewtc-7"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(8)" style="width: 110px;">WC 158 1% <span class="sort-icon" id="sort-ewtc-8"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(9)" style="width: 110px;">WC 157 2% <span class="sort-icon" id="sort-ewtc-9"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(10)" style="width: 110px;">WC 160 2% <span class="sort-icon" id="sort-ewtc-10"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(11)" style="width: 110px;">WV010 5% <span class="sort-icon" id="sort-ewtc-11"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(12)" style="width: 110px;">WC120 2% <span class="sort-icon" id="sort-ewtc-12"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(13)" style="width: 110px;">WC640 1% <span class="sort-icon" id="sort-ewtc-13"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(14)" style="width: 110px;">WV020 5% <span class="sort-icon" id="sort-ewtc-14"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(15)" style="width: 110px;">WI632 1% <span class="sort-icon" id="sort-ewtc-15"></span></th>
+                    <th class="text-right sortable" onclick="sortClientEwtTable(16)" style="width: 110px;">WC690 <span class="sort-icon" id="sort-ewtc-16"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="ewt-client-tbody"></tbody>
+              </table>
+            </div>
+            
+            <div class="pagination-controls" id="ewt-client-pagination" style="display:none; padding: 15px 20px; background: #fff; border: 1px solid #eef2f7; border-top: none; border-radius: 0 0 8px 8px; margin-top: 0;">
+              <span id="ewt-client-page-info" style="color:#5f6368;"></span>
+              <div style="display:flex; gap:10px;">
+                <button type="button" class="page-btn" id="btn-ewtc-prev" onclick="changeClientEwtPage(-1)">Previous</button>
+                <button type="button" class="page-btn" id="btn-ewtc-next" onclick="changeClientEwtPage(1)">Next</button>
+              </div>
+            </div>
+            
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+              <button type="button" class="primary-btn" id="btn-email-client-ewt" onclick="emailClientEwtReport()" style="width:auto; margin:0; background-color: #1a73e8; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 25px; font-size: 14px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                Email EWT Client Excel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION: ACTIVITY LOGS (MATCHED WITH PORTAL A) -->
+        <div id="sec-activity" class="card" style="display:none; max-width: 1000px; margin: 0 auto;">
+          <h3 style="margin-top:0; color:var(--sidebar-bg); font-weight:800; border-bottom: 2px solid #eef2f7; padding-bottom:15px;">Recent System Activity</h3>
+          
+          <!-- Search and Limit for Activity Logs (Matched Exactly with 2307 Portal) -->
+          <div class="ewt-action-bar" style="border: none; padding: 0 0 15px 0; background: transparent;">
+            <div style="display:flex; gap:20px; align-items:center; font-size: 13px; width: 100%;">
+              <input type="text" id="logSearchInput" placeholder="Search anywhere..." onkeyup="filterActivityLogs()" autocomplete="off" style="padding: 8px 12px; height: 35px; box-sizing: border-box; border: 1px solid #e2e5ec; border-radius: 6px; font-size: 13px; font-family: 'Nunito', sans-serif; outline: none; background: #fff; width: 250px; max-width: 300px;">
+              <div style="margin-left: auto; display:flex; align-items:center; gap:5px;">
+                <label for="logRowsPerPage" style="font-weight:bold; color:#5f6368;">Show: </label>
+                <select id="logRowsPerPage" onchange="changeLogRowsPerPage()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid #ccc; cursor:pointer; font-family:'Nunito',sans-serif; font-size:12px; background:#fff;">
+                  <option value="5" selected>5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity Filters Container -->
+          <div class="activity-filters" style="display: flex; gap: 15px; margin-bottom: 25px; align-items: flex-end; flex-wrap: wrap; background: #f8f9fa; padding: 15px 20px; border-radius: 8px; border: 1px solid #eef2f7; box-sizing: border-box;">
+            <div style="flex: 1.5; min-width: 200px;">
+              <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">Filter by Action</label>
+              <select id="logActionFilter" onchange="filterActivityLogs()" style="width: 100%; height:42px; padding: 10px 15px; border: 1px solid #e2e5ec; border-radius: 6px; font-size: 13.5px; outline: none; background: #fff; font-family: 'Nunito', sans-serif; font-weight: 600; color: var(--sidebar-bg); cursor: pointer; box-sizing:border-box;">
+                <option value="">All Actions</option>
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 140px;">
+              <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">Start Date (MM/DD/YYYY)</label>
+              <input type="text" id="logStartDate" class="field-input date-input" placeholder="MM/DD/YYYY" onchange="filterActivityLogs()" style="width: 100%; height:42px; background:#fff; box-sizing:border-box; padding:10px 12px;">
+            </div>
+            <div style="flex: 1; min-width: 140px;">
+              <label style="font-size: 11px; font-weight: 800; color: #8a96a3; text-transform: uppercase; margin-bottom: 5px; display: block;">End Date (MM/DD/YYYY)</label>
+              <input type="text" id="logEndDate" class="field-input date-input" placeholder="MM/DD/YYYY" onchange="filterActivityLogs()" style="width: 100%; height:42px; background:#fff; box-sizing:border-box; padding:10px 12px;">
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+              <button type="button" class="secondary-btn" onclick="clearActivityFilters()" style="height:42px; padding: 0 16px; margin: 0; font-size:12.5px; display:flex; align-items:center;">Clear Filters</button>
+              <button type="button" class="primary-btn" id="btn-delete-client-logs-trigger" onclick="openDeleteLogsModal()" style="height:42px; padding: 0 16px; margin: 0; background-color: #d93025; font-size:12.5px; width: auto; display:flex; align-items:center;">Delete Logs</button>
+            </div>
+          </div>
+
+          <!-- Timeline Container -->
+          <div id="activity-timeline" class="timeline">
+            <p style="color:#8a96a3; font-style:italic;">Loading activity logs...</p>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div class="pagination-controls" id="log-pagination-controls" style="display:none; padding: 15px 0 0 0; background: transparent; border-top: 1px solid #eef2f7; margin-top: 20px;">
+            <span id="log-page-info" style="color:#5f6368;"></span>
+            <div style="display:flex; gap:10px;">
+              <button class="page-btn" id="btn-log-prev" onclick="changeLogPage(-1)">Previous</button>
+              <button class="page-btn" id="btn-log-next" onclick="changeLogPage(1)">Next</button>
+            </div>
+          </div>
+        </div>
+        <!-- SECTION: USER MANAGEMENT (SUPER ADMIN EXCLUSIVE) -->
+        <div id="sec-user-mgmt" class="card" style="display:none; max-width: 1100px; margin: 0 auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eef2f7; padding-bottom: 15px; margin-bottom: 20px;">
+              <div>
+                  <h3 style="margin:0; color:var(--sidebar-bg); font-weight:800;">User Management & Role Permissions</h3>
+                  <p style="margin:5px 0 0 0; color:#8a96a3; font-size:13px;">Manage client portal access, assign roles, and deactivate employees without touching the HR Masterlist.</p>
+              </div>
+              <button type="button" class="secondary-btn" onclick="loadUserManagementData()" style="padding: 8px 16px; margin:0; font-size:12px; display:flex; align-items:center; gap:6px;">↻ Refresh Roster</button>
+          </div>
+
+          <div class="ewt-action-bar" style="border: none; padding: 0 0 15px 0; background: transparent; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+              <input type="text" id="userMgmtSearchInput" class="field-input" placeholder="Search by name, email, department..." onkeyup="filterUserManagementTable()" autocomplete="off" style="padding: 10px 15px; width: 320px; border: 1px solid #e2e5ec; border-radius: 6px; background:#fff;">
+              <div style="display:flex; gap:10px; align-items:center; margin-left:auto;">
+                  <label style="font-size:12px; font-weight:bold; color:#5f6368;">Filter Role:</label>
+                  <select id="userMgmtRoleFilter" onchange="filterUserManagementTable()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc; font-family:'Nunito',sans-serif; font-size:13px; background:#fff;">
+                      <option value="">All Roles</option>
+                      <option value="Super Admin">Super Admin</option>
+                      <option value="Supervisor">Supervisor</option>
+                      <option value="Encoder">Encoder</option>
+                      <option value="Viewer">Viewer</option>
+                  </select>
+              </div>
+          </div>
+
+          <div id="user-mgmt-loader" style="padding: 30px; text-align: center; color: #1a73e8; font-weight: bold; display: none;">
+              <div class="loader-spinner" style="width: 22px; height: 22px; margin-right: 10px;"></div>
+              Fetching employee roster from Pingcon HR Center...
+          </div>
+
+          <div class="table-container-modern" id="user-mgmt-table-container">
+              <table class="ewt-pro-table">
+                  <thead>
+                      <tr>
+                          <th style="width: 50px;" class="text-center">SN</th>
+                          <th>Employee Name</th>
+                          <th>Work Email</th>
+                          <th>Department</th>
+                          <th style="width: 160px;">Portal Role</th>
+                          <th class="text-center" style="width: 140px;">Status</th>
+                          <th class="text-center" style="width: 120px;">Action</th>
+                      </tr>
+                  </thead>
+                  <tbody id="user-mgmt-tbody"></tbody>
+              </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Upgraded Slide-Out Tasks Queue Drawer -->
+    <div id="queue-overlay" class="queue-overlay" onclick="toggleQueueDrawer()"></div>
+    <div id="queue-drawer" class="queue-drawer">
+      <div class="queue-header">
+        <div>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 800;">Verification Queue</h3>
+          <p style="margin: 5px 0 0 0; font-size: 13px; color: #a3aed1; font-weight: 600;">Saving: <span id="q-generating" style="color:#fff;">0</span> | Done: <span id="q-completed" style="color:#fff;">0</span></p>
+        </div>
+        <button type="button" onclick="toggleQueueDrawer()" style="background:none; border:none; color:white; font-size:28px; cursor:pointer; line-height:1; opacity:0.7; transition:0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">&times;</button>
+      </div>
+      <div id="bg-tasks-list" class="queue-body">
+         <div id="empty-queue-msg" style="text-align: center; color: #8a96a3; margin-top: 60px; font-size: 15px; font-weight: 600;">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom:15px; color: #ced4da;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            <br>No active background tasks.
+         </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log("[TRACE] Second script block started executing");
+    window.hasLoadedData = false;
+    window.isFetchingData = false; // Lock to prevent swallowed requests
+
+    function switchTab(tabId) {
+      // 1. Pause Support: Auto-save draft if navigating away from active queue
+      let queueSec = document.getElementById('sec-queue');
+      if (queueSec && queueSec.style.display !== 'none') {
+          saveCurrentQueueDraft();
+      }
+
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      let targetTab = document.getElementById('tab-' + tabId);
+      if(targetTab) targetTab.classList.add('active');
+      
+      document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
+      let targetSec = document.getElementById('sec-' + tabId);
+      if(targetSec) targetSec.style.display = 'block';
+
+      // 2. Resume Support: Reload current item or enforce clean empty state if queue was aborted
+      if (tabId === 'queue') {
+          loadQueueItem();
+      }
+
+      // 3. Auto-Sync: Always render fresh data on Dashboard, Archive, and Audit Logs
+      if (tabId === 'database' || tabId === 'overview') {
+          if (!window.hasLoadedData && !window.isFetchingData) {
+              loadDatabaseData();
+          } else {
+              if (tabId === 'database') renderDatabaseTable();
+              if (tabId === 'overview') updateAnalytics();
+          }
+      } else if (tabId === 'activity') {
+          if (!window.activityLogsCache) {
+              loadActivityLogs();
+          } else {
+              filterActivityLogs();
+          }
+      } else if (tabId === 'user-mgmt') {
+          if (!window.userMgmtCache) {
+              loadUserManagementData();
+          } else {
+              renderUserManagementTable(window.userMgmtCache);
+          }
+      }
+    }
+
+    // =========================================================================
+    // USER MANAGEMENT CONTROLLER (SUPER ADMIN ONLY)
+    // =========================================================================
+    window.userMgmtCache = null;
+
+    function loadUserManagementData() {
+        const token = sessionStorage.getItem('pf_user_token');
+        const loader = document.getElementById('user-mgmt-loader');
+        const container = document.getElementById('user-mgmt-table-container');
+
+        if (loader) loader.style.display = 'block';
+        if (container) container.style.display = 'none';
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (loader) loader.style.display = 'none';
+                if (container) container.style.display = 'block';
+
+                if (res && res.success) {
+                    window.userMgmtCache = res.users;
+                    renderUserManagementTable(res.users);
+                } else {
+                    alert("Error: " + (res ? res.error : "Failed to load users"));
+                }
+            })
+            .withFailureHandler(function(err) {
+                if (loader) loader.style.display = 'none';
+                if (container) container.style.display = 'block';
+                alert("Server Connection Error: " + err.message);
+            })
+            .webappGetPortalUsers(token, 'CLIENT');
+    }
+
+    function filterUserManagementTable() {
+        if (!window.userMgmtCache) return;
+        const query = (document.getElementById('userMgmtSearchInput').value || "").toLowerCase().trim();
+        const roleFilter = document.getElementById('userMgmtRoleFilter').value;
+
+        const filtered = window.userMgmtCache.filter(u => {
+            const matchQuery = !query || 
+                u.name.toLowerCase().includes(query) || 
+                u.email.toLowerCase().includes(query) || 
+                u.department.toLowerCase().includes(query);
+            const matchRole = !roleFilter || u.role === roleFilter;
+            return matchQuery && matchRole;
+        });
+
+        renderUserManagementTable(filtered);
+    }
+
+    function renderUserManagementTable(users) {
+        const tbody = document.getElementById('user-mgmt-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (!users || users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:#8a96a3;">No employees found.</td></tr>';
+            return;
+        }
+
+        users.forEach((u, idx) => {
+            const tr = document.createElement('tr');
+            const isDeactivated = (u.status.toLowerCase() === 'deactivated');
+            if (isDeactivated) tr.style.backgroundColor = '#fffafb';
+
+            const statusBadge = isDeactivated
+                ? `<span class="badge-soft badge-danger">🔴 Deactivated</span>`
+                : `<span class="badge-soft badge-success">🟢 Active</span>`;
+
+            const toggleBtnText = isDeactivated ? "Activate" : "Deactivate";
+            const toggleBtnStyle = isDeactivated ? "background:#e6f4ea; color:#1e8e3e; border:1px solid #ceead6;" : "background:#fff0f0; color:#d93025; border:1px solid #fad2cf;";
+            
+            const safeKey = u.email.replace(/[^a-zA-Z0-9]/g, '_');
+
+            tr.innerHTML = `
+                <td class="text-center" style="color:#8a96a3; font-weight:700;">${idx + 1}</td>
+                <td><strong>${u.name}</strong> ${u.isPermanentAdmin ? '<span title="Permanent Super Admin in Script Properties" style="color:var(--primary-color);">👑</span>' : ''}</td>
+                <td>${u.email}</td>
+                <td><span class="badge-soft badge-secondary">${u.department}</span></td>
+                <td>
+                    <select id="role_select_${safeKey}" ${u.isPermanentAdmin ? 'disabled title="Configured in Script Properties"' : ''} style="width:100%; padding:5px 8px; border-radius:4px; border:1px solid #ccc; font-family:'Nunito',sans-serif; font-size:12px; font-weight:bold; background:#fff;">
+                        <option value="Super Admin" ${u.role === 'Super Admin' ? 'selected' : ''}>Super Admin</option>
+                        <option value="Supervisor" ${u.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
+                        <option value="Encoder" ${u.role === 'Encoder' ? 'selected' : ''}>Encoder</option>
+                        <option value="Viewer" ${u.role === 'Viewer' ? 'selected' : ''}>Viewer</option>
+                    </select>
+                </td>
+                <td class="text-center">
+                    ${statusBadge}
+                    ${!u.isPermanentAdmin ? `<br><button type="button" onclick="toggleUserStatus('${u.email}')" class="ewt-btn" style="margin-top:4px; padding:2px 8px; font-size:10px; ${toggleBtnStyle}">${toggleBtnText}</button>` : ''}
+                </td>
+                <td class="text-center">
+                    <button type="button" id="save_user_btn_${safeKey}" onclick="saveUserAccessRow('${u.email}')" class="ewt-btn ewt-btn-edit" style="width:auto; padding:4px 10px;" ${u.isPermanentAdmin ? 'disabled' : ''}>Save</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    window.toggleUserStatus = function(targetEmail) {
+        if (!window.userMgmtCache) return;
+        const u = window.userMgmtCache.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
+        if (!u) return;
+        const newStatus = (u.status.toLowerCase() === 'active') ? 'Deactivated' : 'Active';
+        u.status = newStatus;
+        saveUserAccessRow(targetEmail);
+    };
+
+    window.saveUserAccessRow = function(targetEmail) {
+        if (!window.userMgmtCache) return;
+        const u = window.userMgmtCache.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
+        if (!u) return;
+
+        const safeKey = u.email.replace(/[^a-zA-Z0-9]/g, '_');
+        const roleSelect = document.getElementById('role_select_' + safeKey);
+        const newRole = roleSelect ? roleSelect.value : u.role;
+        const newStatus = u.status;
+        const btn = document.getElementById('save_user_btn_' + safeKey);
+
+        if (btn) {
+            btn.innerText = "Saving...";
+            btn.disabled = true;
+        }
+
+        const token = sessionStorage.getItem('pf_user_token');
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (btn) {
+                    btn.innerText = "Save";
+                    btn.disabled = false;
+                }
+                if (res && res.success) {
+                    u.role = newRole;
+                    filterUserManagementTable();
+                    alert(`Access updated successfully for ${u.name}!`);
+                } else {
+                    alert("Error: " + (res ? res.error : "Update failed"));
+                }
+            })
+            .withFailureHandler(function(err) {
+                if (btn) {
+                    btn.innerText = "Save";
+                    btn.disabled = false;
+                }
+                alert("Server Connection Error: " + err.message);
+            })
+            .webappUpdateUserAccess(token, u.email, u.name, newRole, newStatus, 'CLIENT');
+    };
+
+    let selectedFiles = [];
+    
+    function handleFileSelect(event) {
+        selectedFiles = Array.from(event.target.files);
+        let listStr = selectedFiles.map(f => "<div>📄 " + f.name + "</div>").join("");
+        document.getElementById('file-list').innerHTML = "<b>Selected Files (" + selectedFiles.length + "):</b><br>" + listStr;
+        document.getElementById('btn-upload').style.display = selectedFiles.length > 0 ? "block" : "none";
+    }
+
+    
+
+    // --- PART 3 UPLOAD & QUEUE SYSTEM ---
+    // SECURITY / STORAGE NOTE: files are read into browser memory only via
+    // readFileAsBase64() and sent straight to the server for AI processing.
+    // No file is ever written to Google Drive at any point in this flow.
+    window.verificationQueue = [];       // one entry PER CERTIFICATE (not per file)
+    window.uploadedFileBytes = {};       // sourceFileKey -> base64 bytes, kept in memory only
+    window.currentQueueIndex = 0;
+
+    async function startUpload() {
+        if(selectedFiles.length === 0) return;
+        let btn = document.getElementById('btn-upload');
+        btn.disabled = true;
+
+        for (let i = 0; i < selectedFiles.length; i++) {
+            let file = selectedFiles[i];
+            let sourceFileKey = 'f_' + Date.now() + '_' + i;
+
+            // 1. Keep a LOCAL copy of the bytes purely for in-browser preview (Part 4).
+            //    This never leaves the browser and is separate from what's sent to the server.
+            try {
+                let dataUrl = await readFileAsBase64(file);
+                window.uploadedFileBytes[sourceFileKey] = dataUrl.split(',')[1];
+            } catch (err) {
+                console.error("Failed to read file locally for preview:", file.name, err);
+            }
+
+            // 2. Read local page count and send with form for multi-page batching
+            let detectedPages = 1;
+            try {
+                let binaryStr = atob(window.uploadedFileBytes[sourceFileKey]);
+                let bBytes = new Uint8Array(binaryStr.length);
+                for (let b = 0; b < binaryStr.length; b++) bBytes[b] = binaryStr.charCodeAt(b);
+                let localPdf = await pdfjsLib.getDocument({ data: bBytes }).promise;
+                detectedPages = localPdf.numPages || 1;
+            } catch(e) {
+                detectedPages = 1;
+            }
+
+            btn.innerText = "AI Scanning (" + detectedPages + " pages)... Please wait";
+
+            let ocrRes;
+            try {
+                let form = document.createElement('form');
+                form.style.display = 'none';
+
+                let nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.name = 'fileName';
+                nameInput.value = file.name;
+                form.appendChild(nameInput);
+
+                let pagesInput = document.createElement('input');
+                pagesInput.type = 'text';
+                pagesInput.name = 'totalPages';
+                pagesInput.value = String(detectedPages);
+                form.appendChild(pagesInput);
+
+                // Pass Company Context so server puts file in correct Entity folder
+                let ctxInput = document.createElement('input');
+                ctxInput.type = 'text';
+                ctxInput.name = 'companyContext';
+                ctxInput.value = "<?= companyContext ?>";
+                form.appendChild(ctxInput);
+
+                let fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.name = 'fileBlob';
+                let dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+                form.appendChild(fileInput);
+
+                document.body.appendChild(form);
+
+                ocrRes = await new Promise((resolve) => {
+                    google.script.run
+                        .withSuccessHandler(resolve)
+                        .withFailureHandler((err) => resolve({ success: false, error: (err && err.message) ? err.message : "Unknown server error." }))
+                        .webappProcessClient2307(form);
+                });
+
+                document.body.removeChild(form);
+            } catch (err) {
+                ocrRes = { success: false, error: err.message };
+            }
+
+            if (ocrRes.success && ocrRes.data && Array.isArray(ocrRes.data.documents) && ocrRes.data.documents.length > 0) {
+                // Keep EVERY physical page extracted (no arbitrary deduplication)
+                ocrRes.data.documents.forEach((doc, idx) => {
+                    let fields = doc.fields || [];
+                    let pageField = fields.find(f => f.label.toLowerCase() === "page");
+                    let pageNum = pageField ? (parseInt(pageField.value, 10) || (idx + 1)) : (idx + 1);
+
+                    window.verificationQueue.push({
+                        queueId: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+                        sourceFileKey: sourceFileKey,
+                        fileName: file.name,
+                        fileId: ocrRes.driveFileId || "", // Permanent Google Drive File ID
+                        driveFileId: ocrRes.driveFileId || "",
+                        pageNum: pageNum,
+                        aiFields: fields,
+                        isSaved: false,
+                        extractionError: null
+                    });
+                });
+            } else {
+                alert("Extraction Error for " + file.name + ":\n" + (ocrRes.error || "No data returned from AI."));
+                console.error("AI Error:", ocrRes);
+                window.verificationQueue.push({
+                    queueId: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+                    sourceFileKey: sourceFileKey,
+                    fileName: file.name,
+                    pageNum: 1,
+                    aiFields: [],
+                    isSaved: false,
+                    extractionError: ocrRes.error || "AI extraction returned no data."
+                });
+            }
+        }
+
+        document.getElementById('file-input').value = "";
+        selectedFiles = [];
+        document.getElementById('file-list').innerHTML = "";
+        btn.style.display = "none";
+        btn.disabled = false;
+        btn.innerText = "Upload & Process Files";
+
+        window.currentQueueIndex = 0;
+        switchTab('queue');
+        loadQueueItem();
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadQueueItem() {
+        let countEl = document.getElementById('queue-count');
+        let emptyMsg = document.getElementById('queue-empty-msg');
+        let splitView = document.getElementById('split-view-container');
+        
+        countEl.innerText = window.verificationQueue.length;
+
+        if (window.verificationQueue.length === 0) {
+            emptyMsg.style.display = 'block';
+            splitView.style.display = 'none';
+            document.getElementById('queue-filename').innerText = "";
+            let topToolbar = document.getElementById('top-toolbar');
+            if (topToolbar) topToolbar.style.display = 'none';
+            return;
+        }
+
+        emptyMsg.style.display = 'none';
+        splitView.style.display = 'flex';
+        let topToolbar = document.getElementById('top-toolbar');
+        if (topToolbar) topToolbar.style.display = 'flex';
+        
+        // Boundary check to ensure we don't index outside the array
+        if (window.currentQueueIndex >= window.verificationQueue.length) {
+            window.currentQueueIndex = window.verificationQueue.length - 1;
+        }
+        if (window.currentQueueIndex < 0) {
+            window.currentQueueIndex = 0;
+        }
+        
+        let item = window.verificationQueue[window.currentQueueIndex];
+        window.currentFileId = item.fileId;
+        
+        // Indicate filename, saved state, or skipped state
+        let statusBadge = "";
+        if (item.isSaved) statusBadge = " <span style='color:#1e8e3e; font-size:12px;'>(Saved ✅)</span>";
+        else if (item.isSkipped) statusBadge = " <span style='color:#f29900; font-size:12px;'>(Skipped ⚠️)</span>";
+        
+        document.getElementById('queue-filename').innerHTML = item.fileName + statusBadge;
+        document.getElementById('page-indicator').innerText = (window.currentQueueIndex + 1) + " / " + window.verificationQueue.length;
+
+        // --- ANTI-BYPASS WORKFLOW ENFORCEMENT ---
+        // Lock the Next (❯) button if the current page has NOT been verified or skipped
+        let prevToolbarBtn = document.getElementById('btn-prev-queue-page');
+        let nextToolbarBtn = document.getElementById('btn-next-queue-page');
+        
+        // Find toolbar buttons inside the modern-toolbar
+        let toolbarBtns = document.querySelectorAll('#top-toolbar .toolbar-btn');
+        let prevArrow = toolbarBtns.length > 0 ? toolbarBtns[0] : null;
+        let nextArrow = toolbarBtns.length > 1 ? toolbarBtns[1] : null;
+
+        if (prevArrow) {
+            prevArrow.disabled = (window.currentQueueIndex === 0);
+            prevArrow.style.opacity = (window.currentQueueIndex === 0) ? '0.3' : '1';
+        }
+
+        if (nextArrow) {
+            // Cannot advance if current page is unverified and unskipped
+            let isVerifiedOrSkipped = (item.isSaved === true || item.isSkipped === true);
+            let isLastPage = (window.currentQueueIndex === window.verificationQueue.length - 1);
+            
+            nextArrow.disabled = (!isVerifiedOrSkipped || isLastPage);
+            nextArrow.style.opacity = (!isVerifiedOrSkipped || isLastPage) ? '0.3' : '1';
+            nextArrow.title = !isVerifiedOrSkipped 
+                ? "Locked: Please Confirm or Skip this certificate before moving forward." 
+                : "Next Certificate";
+        }
+
+        // Disable action buttons for Viewers
+        let vRoleCheck = 'Viewer';
+        try { vRoleCheck = JSON.parse(sessionStorage.getItem('pf_user_data') || '{}').role || 'Viewer'; } catch(e) {}
+        const queueActionButtons = document.getElementById('btn-save-next');
+        const queueSkipButton = document.getElementById('btn-skip-cert');
+        if (queueActionButtons) queueActionButtons.style.display = (vRoleCheck === 'Viewer') ? 'none' : 'block';
+        if (queueSkipButton) queueSkipButton.style.display = (vRoleCheck === 'Viewer') ? 'none' : 'block';
+
+        // Clear previous inputs and remove error borders
+        document.querySelectorAll('.field-input').forEach(el => {
+            el.value = "";
+            el.classList.remove('error-highlight');
+        });
+
+        // 1. FEATURE: Display Confirmed Saved Data if Navigating Back
+        let dataSource = item.savedData || item.draft;
+        if (dataSource) {
+            document.getElementById('f_dateFrom').value = dataSource.dateFrom || "";
+            document.getElementById('f_dateTo').value = dataSource.dateTo || "";
+            document.getElementById('f_siNo').value = dataSource.siNo || "";
+            document.getElementById('f_customer').value = dataSource.customerName || dataSource.customer || "";
+            document.getElementById('f_tin').value = formatTinString(dataSource.tin || "");
+            document.getElementById('f_address').value = dataSource.address || "";
+            document.getElementById('f_income').value = formatDecimalString(dataSource.incomePayment || dataSource.income || "");
+            document.getElementById('f_atc').value = dataSource.atc || "WC158";
+            document.getElementById('f_receiveDate').value = dataSource.receiveDate || "";
+            
+            const taxLabels = ["wc158", "wc160", "wc157", "wc120", "wc640", "wc690", "wv010", "wv020", "wi632"];
+            taxLabels.forEach(t => {
+                let el = document.getElementById('f_' + t);
+                if (el) el.value = formatDecimalString(dataSource[t] || "");
+            });
+
+            renderCurrentPdfPage(item.sourceFileKey, item.pageNum || 1);
+            return;
+        }
+
+        // Auto-fill form inputs from item.aiFields
+        let fields = item.aiFields || (item.aiData && item.aiData.documents && item.aiData.documents[0] ? item.aiData.documents[0].fields : []);
+        if (Array.isArray(fields) && fields.length > 0) {
+            const getVal = (labels) => {
+                let targets = labels.map(l => l.toLowerCase().replace(/[\s_]/g, ''));
+                let f = fields.find(x => targets.includes(String(x.label).toLowerCase().replace(/[\s_]/g, '')));
+                return f && f.value ? String(f.value).trim() : "";
+            };
+
+            // Enforce MM/DD/YYYY strictly
+            const enforceMMDDYYYY = (val) => {
+                if (!val) return "";
+                let parts = val.split(/[\/\-\.]/);
+                if (parts.length === 3) {
+                    let m = parts[0], d = parts[1], y = parts[2];
+                    if (m.length === 4) { y = parts[0]; m = parts[1]; d = parts[2]; } // YYYY-MM-DD
+                    return ('0' + parseInt(m, 10)).slice(-2) + '/' + ('0' + parseInt(d, 10)).slice(-2) + '/' + y;
+                }
+                return val;
+            };
+
+            document.getElementById('f_dateFrom').value = enforceMMDDYYYY(getVal(["Date_From", "Date From", "From", "Period From"]));
+            document.getElementById('f_dateTo').value = enforceMMDDYYYY(getVal(["Date_To", "Date To", "To", "Period To"]));
+            document.getElementById('f_customer').value = getVal(["Customer_Name", "Customer Name", "Payor's Name", "Payor Name"]);
+            document.getElementById('f_tin').value = formatTinString(getVal(["TIN", "Payor TIN", "Payor's TIN"]));
+            document.getElementById('f_address').value = getVal(["Address", "Payor Address", "Payor's Address"]);
+            
+            let incomeVal = getVal(["Income_Payment", "Income Payment", "Gross", "Total"]);
+            document.getElementById('f_income').value = formatDecimalString(incomeVal);
+
+            // Populate Tax Grid
+            const taxLabels = ["WC158", "WC160", "WC157", "WC120", "WC640", "WC690", "WV010", "WV020", "WI632"];
+            taxLabels.forEach(t => {
+                let el = document.getElementById('f_' + t.toLowerCase());
+                if (el) {
+                    let val = getVal([t, t.replace(/(\D+)(\d+)/, '$1 $2')]);
+                    el.value = formatDecimalString(val);
+                }
+            });
+
+            // Set ATC Code
+            let atcVal = getVal(["ATC", "ATC Code"]);
+            if (!atcVal) {
+                for (let t of taxLabels) {
+                    let el = document.getElementById('f_' + t.toLowerCase());
+                    if (el && el.value) { atcVal = t; break; }
+                }
+            }
+            document.getElementById('f_atc').value = atcVal || "WC158";
+            
+            let todayObj = new Date();
+            let todayStr = ('0' + (todayObj.getMonth() + 1)).slice(-2) + '/' + ('0' + todayObj.getDate()).slice(-2) + '/' + todayObj.getFullYear();
+            document.getElementById('f_receiveDate').value = todayStr;
+        }
+
+        // Load PDF preview directly from browser memory using PDF.js
+        renderCurrentPdfPage(item.sourceFileKey, item.pageNum || 1);
+    }
+
+    // =========================================================================
+    // FORMATTING HELPERS (TIN DASHES & CURRENCY COMMAS)
+    // =========================================================================
+    function formatTinString(raw) {
+        if (!raw) return "";
+        let digits = String(raw).replace(/\D/g, '');
+        if (digits.length === 0) return "";
+        let p1 = digits.slice(0, 3);
+        let p2 = digits.slice(3, 6);
+        let p3 = digits.slice(6, 9);
+        let p4 = digits.slice(9);
+        let parts = [p1];
+        if (p2) parts.push(p2);
+        if (p3) parts.push(p3);
+        if (p4) parts.push(p4);
+        return parts.join('-');
+    }
+
+    function formatTinField(el) {
+        if (el && el.value) {
+            el.value = formatTinString(el.value);
+        }
+    }
+
+    function formatDecimalString(val) {
+        if (val === "" || val == null) return "";
+        let num = parseFloat(String(val).replace(/,/g, ''));
+        return (!isNaN(num)) ? num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(val);
+    }
+
+    function formatDecimalField(el) {
+        if (el && el.value.trim() !== "") {
+            el.value = formatDecimalString(el.value);
+        }
+    }
+
+    // ATC Code Rate Directory
+    const ATC_RATES = {
+        'WC158': 0.01,
+        'WC160': 0.02,
+        'WC157': 0.02,
+        'WC120': 0.02,
+        'WC640': 0.01,
+        'WC690': 0.01,
+        'WV010': 0.05,
+        'WV020': 0.05,
+        'WI632': 0.01
+    };
+
+    function toggleAtcDropdown(e) {
+        e.stopPropagation();
+        const dd = document.getElementById('atc_dropdown');
+        dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+    }
+
+    // Keyboard Shortcut: Ctrl + Enter (or Cmd + Enter on Mac) to Confirm & Next
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            let queueSec = document.getElementById('sec-queue');
+            if (queueSec && queueSec.style.display !== 'none') {
+                e.preventDefault();
+                let saveBtn = document.getElementById('btn-save-next');
+                if (saveBtn && !saveBtn.disabled) {
+                    saveAndNextItem();
+                }
+            }
+        }
+    });
+
+    function selectAtcOption(atcCode) {
+        document.getElementById('f_atc').value = atcCode;
+        handleAtcChange(atcCode);
+        const dd = document.getElementById('atc_dropdown');
+        if (dd) dd.style.display = 'none';
+    }
+
+    // Direction 1: ATC Selection -> Auto-compute the corresponding Tax Field with Commas
+    function handleAtcChange(rawAtc) {
+        const atc = String(rawAtc).trim().toUpperCase();
+        const rate = ATC_RATES[atc] || 0.01;
+        const income = parseFloat(document.getElementById('f_income').value.replace(/,/g, '')) || 0;
+
+        // Clear all tax input boxes
+        document.querySelectorAll('.tax-input').forEach(el => el.value = "");
+
+        if (income > 0) {
+            const taxAmount = (income * rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const targetInputId = 'f_' + atc.toLowerCase();
+            const targetInput = document.getElementById(targetInputId);
+            if (targetInput) {
+                targetInput.value = taxAmount;
+            } else {
+                document.getElementById('f_wc158').value = taxAmount;
+            }
+        }
+    }
+
+    // Recalculate tax whenever the Income Payment (Base) changes
+    document.getElementById('f_income').addEventListener('input', function() {
+        const atc = document.getElementById('f_atc').value.trim().toUpperCase() || 'WC158';
+        handleAtcChange(atc);
+    });
+
+    // Direction 2: Clicking or typing a Tax Box -> Auto-fill amount & update ATC
+    document.querySelectorAll('.tax-input').forEach(input => {
+        input.addEventListener('click', function() {
+            const atcKey = this.id.replace('f_', '').toUpperCase();
+            document.getElementById('f_atc').value = atcKey;
+            handleAtcChange(atcKey);
+        });
+
+        input.addEventListener('input', function() {
+            if (this.value) {
+                const atcKey = this.id.replace('f_', '').toUpperCase();
+                document.getElementById('f_atc').value = atcKey;
+                // Clear other tax fields
+                document.querySelectorAll('.tax-input').forEach(el => {
+                    if (el !== this) el.value = "";
+                });
+            }
+        });
+    });
+
+    // Clear error highlight instantly when the user starts typing
+    document.querySelectorAll('.field-input').forEach(input => {
+        input.addEventListener('input', function() {
+            this.classList.remove('error-highlight');
+        });
+    });
+
+    function showHistoricalArchivePlaceholder() {
+        let canvas = document.getElementById('pdf-preview-canvas');
+        if (canvas) canvas.style.display = 'none';
+        let existingCard = document.getElementById('archive-placeholder-card');
+        if (existingCard) existingCard.remove();
+
+        let wrapper = document.getElementById('pdf-viewport-wrapper');
+        if (!wrapper) return;
+
+        let card = document.createElement('div');
+        card.id = 'archive-placeholder-card';
+        card.style.cssText = "display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px 20px; color:#fff; width:85%; background:rgba(255,255,255,0.06); border:2px dashed rgba(255,255,255,0.25); border-radius:12px; cursor:pointer;";
+        card.onclick = function() { document.getElementById('archive-pdf-drop-input').click(); };
+        
+        card.innerHTML = `
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:800; color:#fff;">Historical Archive Record</h3>
+            <p style="margin:0 0 15px 0; font-size:12px; color:#d1d7e2; line-height:1.5;">Original PDF is not saved in cloud storage to conserve space.<br><strong>All fields on the right are fully editable and can be updated directly.</strong></p>
+            <div style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); padding:6px 14px; border-radius:20px; font-size:11px; color:#fff;">
+                📂 Click or drop PDF here to view document while editing
+            </div>
+            <input type="file" id="archive-pdf-drop-input" accept="application/pdf" style="display:none;" onchange="loadArchiveDroppedPdf(event)">
+        `;
+        wrapper.appendChild(card);
+    }
+    
+    // Optional: Allows user to drop the local PDF while editing an archived record to view it
+    async function loadArchiveDroppedPdf(event) {
+        if (!event.target.files || event.target.files.length === 0) return;
+        let file = event.target.files[0];
+        let currentItem = window.verificationQueue[window.currentQueueIndex];
+        if (!currentItem) return;
+
+        let key = 'archive_view_' + Date.now();
+        currentItem.sourceFileKey = key;
+        
+        let dataUrl = await readFileAsBase64(file);
+        window.uploadedFileBytes[key] = dataUrl.split(',')[1];
+        
+        let card = document.getElementById('archive-placeholder-card');
+        if (card) card.remove();
+        let canvas = document.getElementById('pdf-preview-canvas');
+        if (canvas) canvas.style.display = 'block';
+
+        renderCurrentPdfPage(key, 1);
+    }
+
+    // Revert current page edits back to clean AI values
+    function resetCurrentPage() {
+        if (!window.verificationQueue || !window.verificationQueue[window.currentQueueIndex]) return;
+        let currentItem = window.verificationQueue[window.currentQueueIndex];
+        
+        // Remove draft memory for this page
+        delete currentItem.draft;
+        
+        // Reload form fields from original AI extraction
+        loadQueueItem();
+    }
+
+    // Open Abort Batch Modal with detailed count summary
+    function openAbortModal() {
+        if (!window.verificationQueue || window.verificationQueue.length === 0) return;
+        
+        let total = window.verificationQueue.length;
+        let savedCount = window.verificationQueue.filter(x => x.isSaved).length;
+        let remaining = total - savedCount;
+        
+        let summaryEl = document.getElementById('abort-modal-summary');
+        if (summaryEl) {
+            summaryEl.innerHTML = "You have confirmed <strong>" + savedCount + "</strong> of <strong>" + total + "</strong> certificates.<br><br>Are you sure you want to abort? The remaining <strong>" + remaining + "</strong> unverified certificate(s) will be discarded from memory.";
+        }
+        
+        let modal = document.getElementById('abort-batch-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeAbortModal() {
+        let modal = document.getElementById('abort-batch-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // Discard remaining unverified queue, wipe the screen completely, and return to Upload tab
+    function executeAbortBatch() {
+        closeAbortModal();
+        
+        // 1. Wipe in-memory queue & PDF cache
+        window.verificationQueue = [];
+        window.currentQueueIndex = 0;
+        window.uploadedFileBytes = {};
+        window.pdfDocCache = {};
+
+        // 2. Cancel active render task & clear canvas
+        if (window.currentRenderTask) {
+            try { window.currentRenderTask.cancel(); } catch(e) {}
+            window.currentRenderTask = null;
+        }
+        let canvas = document.getElementById('pdf-preview-canvas');
+        if (canvas) {
+            let ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 3. Wipe all input boxes & tax fields
+        document.querySelectorAll('.field-input').forEach(el => {
+            el.value = "";
+            el.classList.remove('error-highlight');
+        });
+
+        // 4. Reset toolbars & headers
+        let topToolbar = document.getElementById('top-toolbar');
+        if (topToolbar) topToolbar.style.display = 'none';
+
+        let filenameEl = document.getElementById('queue-filename');
+        if (filenameEl) filenameEl.innerText = "";
+
+        let pageInd = document.getElementById('page-indicator');
+        if (pageInd) pageInd.innerText = "1 / 1";
+
+        // 5. Hide split view and show clean empty placeholder
+        let splitView = document.getElementById('split-view-container');
+        if (splitView) splitView.style.display = 'none';
+
+        let emptyMsg = document.getElementById('queue-empty-msg');
+        if (emptyMsg) emptyMsg.style.display = 'block';
+
+        // 6. Navigate to Upload tab
+        switchTab('upload');
+    }
+
+    // Open Skip Confirmation Modal
+    function openSkipModal() {
+        if (!window.verificationQueue || !window.verificationQueue[window.currentQueueIndex]) return;
+        let currentItem = window.verificationQueue[window.currentQueueIndex];
+        let pageNum = currentItem.pageNum || (window.currentQueueIndex + 1);
+        let targetEl = document.getElementById('skip-modal-target');
+        if (targetEl) {
+            targetEl.innerText = "Page " + pageNum + " of " + currentItem.fileName;
+        }
+        let modal = document.getElementById('skip-confirm-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeSkipModal() {
+        let modal = document.getElementById('skip-confirm-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // Execute Skip: Log to Audit, Do NOT save to DB, advance to next page
+    function executeSkipCertificate() {
+        let btn = document.getElementById('btn-confirm-skip-exec');
+        if (!window.verificationQueue || !window.verificationQueue[window.currentQueueIndex]) return;
+        let currentItem = window.verificationQueue[window.currentQueueIndex];
+        let currentPageNum = currentItem.pageNum || (window.currentQueueIndex + 1);
+
+        btn.innerText = "Skipping...";
+        btn.disabled = true;
+
+        // Log skip asynchronously in the background
+        google.script.run
+            .withFailureHandler(function(err) {
+                console.warn("Skip log background error: " + err.message);
+            })
+            .webappLogClient2307Skip({
+                pageNum: currentPageNum,
+                fileName: currentItem.fileName || ""
+            }, "<?= companyContext ?>", sessionStorage.getItem('pf_user_token'));
+
+        // Mark current item as skipped and clear draft memory
+        currentItem.isSkipped = true;
+        delete currentItem.draft;
+        delete currentItem.savedData;
+        // Invalidate activity logs cache so the skip entry appears immediately
+        window.activityLogsCache = null;
+
+        btn.innerText = "Confirm Skip";
+        btn.disabled = false;
+        closeSkipModal();
+
+        // Advance to next page
+        if (window.currentQueueIndex < window.verificationQueue.length - 1) {
+            window.currentQueueIndex++;
+            loadQueueItem();
+        } else {
+            alert("All certificates in this batch have been reviewed!");
+            switchTab('database');
+            loadDatabaseData();
+        }
+    }
+    // =========================================================================
+    // ASYNCHRONOUS TASKS QUEUE CONTROLLER (NON-BLOCKING BACKGROUND SAVES)
+    // =========================================================================
+    window.qGenerating = 0;
+    window.qCompleted = 0;
+
+    function updateQueueCounts() {
+        let genEl = document.getElementById('q-generating');
+        let compEl = document.getElementById('q-completed');
+        if (genEl) genEl.innerText = window.qGenerating;
+        if (compEl) compEl.innerText = window.qCompleted;
+
+        let totalTasks = window.qGenerating + window.qCompleted;
+        let badge = document.getElementById('header-q-badge');
+        let emptyMsg = document.getElementById('empty-queue-msg');
+
+        if (badge) {
+            if (totalTasks > 0) {
+                badge.style.display = 'inline-block';
+                badge.innerText = window.qGenerating > 0 ? window.qGenerating + ' Active' : window.qCompleted + ' Done';
+                badge.style.backgroundColor = window.qGenerating > 0 ? '#d93025' : '#1e8e3e';
+                if (emptyMsg) emptyMsg.style.display = 'none';
+            } else {
+                badge.style.display = 'none';
+                if (emptyMsg) emptyMsg.style.display = 'block';
+            }
+        }
+    }
+
+    function toggleQueueDrawer() {
+        const drawer = document.getElementById('queue-drawer');
+        const overlay = document.getElementById('queue-overlay');
+        if (!drawer || !overlay) return;
+        if (drawer.classList.contains('open')) {
+            drawer.classList.remove('open');
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.style.display = 'none', 300);
+        } else {
+            overlay.style.display = 'block';
+            setTimeout(() => {
+                drawer.classList.add('open');
+                overlay.classList.add('show');
+            }, 10);
+        }
+    }
+
+    function removeFromQueue(taskId) {
+        let q = getSavedClientQueue();
+        q = q.filter(t => t.taskId !== taskId);
+        localStorage.setItem('client_2307_queue_<?= companyContext ?>', JSON.stringify(q));
+
+        let card = document.getElementById(taskId);
+        if (card) {
+            if (card.innerHTML.includes('loader-spinner') || card.innerHTML.includes('Saving')) {
+                window.qGenerating = Math.max(0, window.qGenerating - 1);
+            } else {
+                window.qCompleted = Math.max(0, window.qCompleted - 1);
+            }
+            card.remove();
+        }
+        updateQueueCounts();
+    }
+
+    function getSavedClientQueue() {
+        let q = localStorage.getItem('client_2307_queue_<?= companyContext ?>');
+        return q ? JSON.parse(q) : [];
+    }
+
+    function saveToClientQueue(task) {
+        let q = getSavedClientQueue();
+        q.push(task);
+        localStorage.setItem('client_2307_queue_<?= companyContext ?>', JSON.stringify(q));
+    }
+
+    function loadSavedClientQueue() {
+        let q = getSavedClientQueue();
+        if (q.length > 0) {
+            let emptyMsg = document.getElementById('empty-queue-msg');
+            if (emptyMsg) emptyMsg.style.display = 'none';
+            let list = document.getElementById("bg-tasks-list");
+
+            q.forEach(task => {
+                if (document.getElementById(task.taskId)) return;
+                let card = document.createElement("div");
+                card.id = task.taskId;
+                card.style.cssText = "background:white; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:10px; font-size:13px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid #1e8e3e;";
+                card.innerHTML = `
+                    <div style="font-weight:bold; margin-bottom:4px; color:#1e8e3e; display:flex; justify-content:space-between; align-items:flex-start;">
+                        <span>${task.label} - Saved ✅</span>
+                        <button type="button" onclick="removeFromQueue('${task.taskId}')" title="Dismiss" style="background:none; border:none; cursor:pointer; color:#8a96a3; font-size:16px; line-height:1; padding:0;">&times;</button>
+                    </div>
+                    <div style="color:#5f6368; font-size:11.5px;">${task.details || ""}</div>`;
+                if (list) list.prepend(card);
+            });
+            window.qCompleted = q.length;
+            updateQueueCounts();
+        }
+    }
+
+    function saveAndNextItem() {
+        // Fetch all base field values
+        let dateFrom = document.getElementById('f_dateFrom').value.trim();
+        let dateTo = document.getElementById('f_dateTo').value.trim();
+        let siNo = document.getElementById('f_siNo').value.trim();
+        let customer = document.getElementById('f_customer').value.trim();
+        let tin = document.getElementById('f_tin').value.trim();
+        let address = document.getElementById('f_address').value.trim();
+        let income = document.getElementById('f_income').value.trim();
+        let atc = document.getElementById('f_atc').value.trim();
+        let receiveDate = document.getElementById('f_receiveDate').value.trim();
+        
+        // Fetch all tax grid values
+        let wc158 = document.getElementById('f_wc158').value.trim();
+        let wc157 = document.getElementById('f_wc157').value.trim();
+        let wc160 = document.getElementById('f_wc160').value.trim();
+        let wv010 = document.getElementById('f_wv010').value.trim();
+        let wc120 = document.getElementById('f_wc120').value.trim();
+        let wc640 = document.getElementById('f_wc640').value.trim();
+        let wv020 = document.getElementById('f_wv020').value.trim();
+        let wi632 = document.getElementById('f_wi632').value.trim();
+        let wc690 = document.getElementById('f_wc690').value.trim();
+
+        // Reset highlights
+        document.querySelectorAll('.error-highlight').forEach(el => el.classList.remove('error-highlight'));
+
+        let baseFields = [
+            { id: 'f_dateFrom', val: dateFrom, name: 'Date From' },
+            { id: 'f_dateTo', val: dateTo, name: 'Date To' },
+            { id: 'f_siNo', val: siNo, name: 'SI No.' },
+            { id: 'f_customer', val: customer, name: 'Customer Name' },
+            { id: 'f_tin', val: tin, name: 'TIN' },
+            { id: 'f_address', val: address, name: 'Address' },
+            { id: 'f_income', val: income, name: 'Income Payment (Base)' },
+            { id: 'f_atc', val: atc, name: 'ATC Code' },
+            { id: 'f_receiveDate', val: receiveDate, name: '2307 Receive Date' }
+        ];
+
+        // 1. Validate Base Fields
+        for (let i = 0; i < baseFields.length; i++) {
+            if (!baseFields[i].val) {
+                let el = document.getElementById(baseFields[i].id);
+                el.classList.add('error-highlight');
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.focus();
+                alert("Validation Error: Please fill in the required field - " + baseFields[i].name);
+                return;
+            }
+        }
+
+        // 2. Validate Tax Grid (At least one must be provided)
+        if (!wc158 && !wc157 && !wc160 && !wv010 && !wc120 && !wc640 && !wv020 && !wi632 && !wc690) {
+            let el = document.getElementById('f_wc158');
+            el.classList.add('error-highlight');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+            alert("Validation Error: Please enter a value for at least one tax category in the Tax Withheld Grid.");
+            return;
+        }
+
+        let currentItem = window.verificationQueue[window.currentQueueIndex] || {};
+        let currentPageNum = currentItem.pageNum || (window.currentQueueIndex + 1);
+
+        // CAPTURE ONLY THIS EXACT SINGLE PAGE AS HIGH-RES LIGHTWEIGHT JPEG
+        let pageImageBase64 = "";
+        let canvas = document.getElementById('pdf-preview-canvas');
+        if (canvas && canvas.style.display !== 'none' && canvas.width > 50 && canvas.height > 50) {
+            try {
+                // High-resolution JPEG snapshot (~150KB to 250KB instead of 40MB)
+                pageImageBase64 = canvas.toDataURL('image/jpeg', 0.88);
+            } catch(e) {
+                console.warn("Could not capture page canvas: " + e.message);
+            }
+        }
+
+        let payload = {
+            recordId: currentItem.fileName + "_P" + currentPageNum,
+            pageNum: currentPageNum,
+            fileId: currentItem.driveFileId || window.currentFileId || "",
+            rowSn: currentItem.rowSn || "",
+            fileName: currentItem.fileName || "",
+            pageImageBase64: pageImageBase64, // Transmits only this single certificate to Drive
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            siNo: siNo,
+            customerName: customer,
+            tin: tin,
+            address: address,
+            atc: atc,
+            receiveDate: receiveDate,
+            incomePayment: income,
+            wc158: wc158,
+            wc157: wc157,
+            wc160: wc160,
+            wv010: wv010,
+            wc120: wc120,
+            wc640: wc640,
+            wv020: wv020,
+            wi632: wi632,
+            wc690: wc690
+        };
+
+        // 3. SPAWN BACKGROUND TASK IN DRAWER
+        window.qGenerating++;
+        updateQueueCounts();
+
+        let taskId = "task_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4);
+        let list = document.getElementById("bg-tasks-list");
+        let emptyMsg = document.getElementById("empty-queue-msg");
+        if (emptyMsg) emptyMsg.style.display = "none";
+
+        let qBtn = document.getElementById('header-queue-btn');
+        if (qBtn) { 
+            qBtn.style.transform = 'scale(1.05)'; 
+            setTimeout(() => qBtn.style.transform = 'scale(1)', 200); 
+        }
+
+        let card = document.createElement("div");
+        card.id = taskId;
+        card.style.cssText = "background:white; border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:10px; font-size:13px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid #fbbc04;";
+        card.innerHTML = `
+            <div style="font-weight:bold; margin-bottom:5px; color:#1a73e8; display:flex; justify-content:space-between; align-items:flex-start;">
+                <span>Page ${currentPageNum}: ${payload.customerName || payload.siNo}</span>
+                <button type="button" onclick="removeFromQueue('${taskId}')" title="Dismiss" style="background:none; border:none; cursor:pointer; color:#8a96a3; font-size:16px; line-height:1; padding:0;">&times;</button>
+            </div>
+            <div style="color:#5f6368; display:flex; align-items:center; gap:6px;">
+                <span class="loader-spinner" style="width:12px; height:12px; border-width:2px; margin:0;"></span> Saving to database...
+            </div>`;
+        if (list) list.prepend(card);
+
+        // Attach confirmed payload and mark as saved in queue memory
+        if (window.verificationQueue[window.currentQueueIndex]) {
+            window.verificationQueue[window.currentQueueIndex].isSaved = true;
+            window.verificationQueue[window.currentQueueIndex].savedData = payload; // Preserves true confirmed data
+        }
+
+        // 4. FIRE SAVE TO SERVER ASYNCHRONOUSLY IN BACKGROUND
+        google.script.run
+            .withSuccessHandler(function(res) {
+                window.qGenerating = Math.max(0, window.qGenerating - 1);
+                window.qCompleted++;
+                updateQueueCounts();
+
+                let cardEl = document.getElementById(taskId);
+                if (!cardEl) return;
+
+                if (res && res.success) {
+                    cardEl.style.borderLeft = "4px solid #1e8e3e";
+                    cardEl.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom:4px; color:#1e8e3e; display:flex; justify-content:space-between; align-items:flex-start;">
+                            <span>Page ${currentPageNum}: ${payload.customerName || payload.siNo} - Saved ✅</span>
+                            <button type="button" onclick="removeFromQueue('${taskId}')" title="Dismiss" style="background:none; border:none; cursor:pointer; color:#8a96a3; font-size:16px; line-height:1; padding:0;">&times;</button>
+                        </div>
+                        <div style="color:#5f6368; font-size:11.5px;">SI: ${payload.siNo} | ${payload.incomePayment}</div>`;
+                    saveToClientQueue({ 
+                        taskId: taskId, 
+                        label: `Page ${currentPageNum}: ${payload.customerName || payload.siNo}`, 
+                        details: `SI: ${payload.siNo} | ${payload.incomePayment}`, 
+                        timestamp: Date.now() 
+                    });
+
+                    // AUTO-SYNC: Invalidate caches and trigger silent background sync
+                    window.hasLoadedData = false;
+                    window.activityLogsCache = null;
+                    loadDatabaseData(true);
+                    loadActivityLogs(true);
+                } else {
+                    cardEl.style.borderLeft = "4px solid #d93025";
+                    cardEl.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom:4px; color:#d93025; display:flex; justify-content:space-between; align-items:flex-start;">
+                            <span>Page ${currentPageNum}: ${payload.customerName || payload.siNo} - Failed ❌</span>
+                            <button type="button" onclick="removeFromQueue('${taskId}')" title="Dismiss" style="background:none; border:none; cursor:pointer; color:#8a96a3; font-size:16px; line-height:1; padding:0;">&times;</button>
+                        </div>
+                        <div style="color:#d93025; font-size:11.5px;">${res ? res.error : "Unknown error"}</div>`;
+                }
+            })
+            .withFailureHandler(function(err) {
+                window.qGenerating = Math.max(0, window.qGenerating - 1);
+                window.qCompleted++;
+                updateQueueCounts();
+
+                let cardEl = document.getElementById(taskId);
+                if (!cardEl) return;
+                cardEl.style.borderLeft = "4px solid #d93025";
+                cardEl.innerHTML = `
+                    <div style="font-weight:bold; margin-bottom:4px; color:#d93025; display:flex; justify-content:space-between; align-items:flex-start;">
+                        <span>Page ${currentPageNum}: ${payload.customerName || payload.siNo} - Error ❌</span>
+                        <button type="button" onclick="removeFromQueue('${taskId}')" title="Dismiss" style="background:none; border:none; cursor:pointer; color:#8a96a3; font-size:16px; line-height:1; padding:0;">&times;</button>
+                    </div>
+                    <div style="color:#d93025; font-size:11.5px;">${err.message}</div>`;
+            })
+            .webappSaveClient2307(payload, "<?= companyContext ?>", sessionStorage.getItem('pf_user_token'));
+
+        // 5. If this was an Archive Edit, return cleanly to the Archive tab
+        if (currentItem.isArchiveEdit) {
+            alert(`Record for ${payload.customerName || payload.siNo} has been updated and saved!`);
+            window.verificationQueue.shift(); // Remove from queue
+            switchTab('database');
+            loadDatabaseData();
+            return;
+        }
+
+        // Standard batch flow: advance to next unverified page
+        if (window.currentQueueIndex < window.verificationQueue.length - 1) {
+            window.currentQueueIndex++;
+            loadQueueItem();
+        } else {
+            alert("All certificates in this batch have been verified and are saving in the background!");
+            switchTab('database');
+        }
+    }
+
+    // Zoom, Rotate, and Drag Logic for PDF Viewer
+    let imgZoom = 1, imgX = 0, imgY = 0, imgRot = 0, isDragging = false, startX, startY;
+
+    // Cache current form values into queue memory so flipping pages doesn't wipe unsaved input
+    function saveCurrentQueueDraft() {
+        if (!window.verificationQueue || !window.verificationQueue[window.currentQueueIndex]) return;
+        let currentItem = window.verificationQueue[window.currentQueueIndex];
+        currentItem.draft = {
+            dateFrom: document.getElementById('f_dateFrom').value,
+            dateTo: document.getElementById('f_dateTo').value,
+            siNo: document.getElementById('f_siNo').value,
+            customer: document.getElementById('f_customer').value,
+            tin: document.getElementById('f_tin').value,
+            address: document.getElementById('f_address').value,
+            income: document.getElementById('f_income').value,
+            atc: document.getElementById('f_atc').value,
+            receiveDate: document.getElementById('f_receiveDate').value,
+            wc158: document.getElementById('f_wc158').value,
+            wc160: document.getElementById('f_wc160').value,
+            wc157: document.getElementById('f_wc157').value,
+            wc120: document.getElementById('f_wc120').value,
+            wc640: document.getElementById('f_wc640').value,
+            wc690: document.getElementById('f_wc690').value,
+            wv010: document.getElementById('f_wv010').value,
+            wv020: document.getElementById('f_wv020').value,
+            wi632: document.getElementById('f_wi632').value
+        };
+    }
+
+    function changeQueueItem(dir) {
+        if (!window.verificationQueue || window.verificationQueue.length <= 1) return;
+        
+        saveCurrentQueueDraft();
+        
+        window.currentQueueIndex += dir;
+        
+        if (window.currentQueueIndex < 0) window.currentQueueIndex = 0;
+        if (window.currentQueueIndex >= window.verificationQueue.length) window.currentQueueIndex = window.verificationQueue.length - 1;
+        
+        loadQueueItem();
+    }
+
+    // PDF.js Worker Configuration
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    window.pdfDocCache = {}; // Cache PDF documents in browser memory to avoid re-parsing
+
+    window.currentRenderTask = null;
+
+    async function renderCurrentPdfPage(sourceFileKey, pageNumber) {
+        const loader = document.getElementById('img-loader');
+        const wrapper = document.getElementById('pdf-viewport-wrapper');
+        const oldCanvas = document.getElementById('pdf-preview-canvas');
+        if (!wrapper || !oldCanvas) return;
+
+        // DECLARED AT TOP: Accessible in both try and catch blocks
+        let base64Data = null;
+
+        // 1. Cancel previous render task if still in progress
+        if (window.currentRenderTask) {
+            try { window.currentRenderTask.cancel(); } catch(e) {}
+            window.currentRenderTask = null;
+        }
+
+        // 2. Fresh Canvas Swap: eliminates PDF.js graphics context collisions
+        const canvas = document.createElement('canvas');
+        canvas.id = 'pdf-preview-canvas';
+        canvas.style.cssText = oldCanvas.style.cssText;
+        wrapper.replaceChild(canvas, oldCanvas);
+        const ctx = canvas.getContext('2d');
+
+        if (loader) {
+            loader.innerText = "Rendering Page " + pageNumber + "...";
+            loader.style.display = 'block';
+        }
+
+        resetZoom();
+
+        try {
+            if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+
+            base64Data = window.uploadedFileBytes[sourceFileKey];
+            if (!base64Data) throw new Error("File data not found in browser memory.");
+
+            let pdfDoc = window.pdfDocCache[sourceFileKey];
+            if (!pdfDoc) {
+                const binaryStr = atob(base64Data);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i);
+                }
+                pdfDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+                window.pdfDocCache[sourceFileKey] = pdfDoc;
+            }
+
+            const targetPage = Math.min(Math.max(1, pageNumber), pdfDoc.numPages);
+            const page = await pdfDoc.getPage(targetPage);
+
+            const scale = 2.0;
+            const viewport = page.getViewport({ scale: scale });
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            // Render onto the fresh canvas context
+            window.currentRenderTask = page.render({ canvasContext: ctx, viewport: viewport });
+            await window.currentRenderTask.promise;
+            window.currentRenderTask = null;
+
+            if (loader) loader.style.display = 'none';
+        } catch (err) {
+            if (err && (err.name === 'RenderingCancelledException' || String(err.message).includes('cancelled'))) {
+                return;
+            }
+            if (loader) loader.style.display = 'none';
+
+            let currentItem = window.verificationQueue[window.currentQueueIndex] || {};
+
+            // If PDF is not in memory (Archive Edit), display professional card with optional dropzone
+            if (!base64Data || currentItem.isArchiveEdit) {
+                canvas.style.display = 'none';
+                let existingCard = document.getElementById('archive-placeholder-card');
+                if (existingCard) existingCard.remove();
+
+                let card = document.createElement('div');
+                card.id = 'archive-placeholder-card';
+                card.style.cssText = "display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px 20px; color:#fff; width:85%; background:rgba(255,255,255,0.06); border:2px dashed rgba(255,255,255,0.25); border-radius:12px; cursor:pointer;";
+                card.onclick = function() { document.getElementById('archive-pdf-drop-input').click(); };
+                
+                card.innerHTML = `
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" style="margin-bottom:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:800; color:#fff;">Historical Archive Record</h3>
+                    <p style="margin:0 0 15px 0; font-size:12px; color:#d1d7e2; line-height:1.5;">Original PDF is not saved in cloud storage to conserve space.<br><strong>All fields on the right are fully editable and can be updated directly.</strong></p>
+                    <div style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); padding:6px 14px; border-radius:20px; font-size:11px; color:#fff;">
+                        📂 Click or drop PDF here to view document while editing
+                    </div>
+                    <input type="file" id="archive-pdf-drop-input" accept="application/pdf" style="display:none;" onchange="loadArchiveDroppedPdf(event)">
+                `;
+                wrapper.appendChild(card);
+            } else {
+                if (loader) {
+                    loader.innerText = "Preview unavailable: " + err.message;
+                    loader.style.display = 'block';
+                }
+            }
+        }
+    }
+
+    function changeZoom(step) { imgZoom += step; if(imgZoom < 0.2) imgZoom = 0.2; applyTransform(); }
+    function rotateImage() { imgRot = (imgRot + 90) % 360; applyTransform(); }
+    function resetZoom() { imgZoom = 1; imgX = 0; imgY = 0; imgRot = 0; applyTransform(); }
+    function applyTransform() { 
+        let wrapper = document.getElementById('pdf-viewport-wrapper');
+        if (wrapper) {
+            wrapper.style.transform = "translate(" + imgX + "px, " + imgY + "px) scale(" + imgZoom + ") rotate(" + imgRot + "deg)"; 
+        }
+    }
+    
+    let imgContainer = document.querySelector('.image-side');
+    if (imgContainer) {
+        imgContainer.onwheel = e => { e.preventDefault(); changeZoom(e.deltaY < 0 ? 0.1 : -0.1); };
+        imgContainer.onmousedown = e => {
+            if (e.target.closest('.modern-toolbar')) return;
+            isDragging = true; startX = e.clientX - imgX; startY = e.clientY - imgY;
+            let wrapper = document.getElementById('pdf-viewport-wrapper');
+            if (wrapper) wrapper.style.cursor = 'grabbing';
+        };
+        window.addEventListener('mouseup', () => { 
+            isDragging = false; 
+            let wrapper = document.getElementById('pdf-viewport-wrapper');
+            if (wrapper) wrapper.style.cursor = 'grab'; 
+        });
+        window.addEventListener('mousemove', e => {
+            if(!isDragging) return; e.preventDefault();
+            imgX = e.clientX - startX; imgY = e.clientY - startY; applyTransform();
+        });
+    }
+  // =========================================================================
+    // PART 4: DATABASE, EDITING, AND ANALYTICS LOGIC
+    // =========================================================================
+    
+    window.dbCache = [];
+    window.dbPage = 1;
+    window.dbRowsPerPage = 10;
+    window.dbSortCol = 'sn';
+    window.dbSortAsc = true;
+    window.pendingDbDeletions = []; // Holds records staged for deletion
+
+    function loadDatabaseData(isSilent = false) {
+        if (window.isFetchingData) return;
+        window.isFetchingData = true; 
+        
+        let loader = document.getElementById('db-loader');
+        let tableCont = document.getElementById('db-table-container');
+        if (loader && !isSilent) loader.style.display = 'block';
+        if (tableCont && !isSilent) tableCont.style.display = 'none';
+        
+        google.script.run
+            .withSuccessHandler(function(res) {
+                window.isFetchingData = false; 
+                window.hasLoadedData = true; 
+                if (loader) loader.style.display = 'none';
+                if (tableCont) tableCont.style.display = 'block';
+                
+                if (res && res.error) {
+                    console.error("Backend Error: " + res.error);
+                    return;
+                }
+                
+                if (res && Array.isArray(res.data)) {
+                    window.dbCache = res.data;
+                    window.dbCache.forEach((item, i) => item._origIndex = i);
+                    renderDatabaseTable();
+                    updateAnalytics();
+                }
+            })
+            .withFailureHandler(function(err) {
+                window.isFetchingData = false; 
+                if (loader) loader.style.display = 'none';
+                if (tableCont) tableCont.style.display = 'block';
+                console.error("Server connection lost: " + err.message);
+            })
+            .webappGetClient2307Data("<?= companyContext ?>");
+    }
+
+    function sortDatabase(column) {
+        if (window.dbSortCol === column) {
+            window.dbSortAsc = !window.dbSortAsc;
+        } else {
+            window.dbSortCol = column;
+            window.dbSortAsc = true;
+        }
+        window.dbPage = 1;
+        renderDatabaseTable();
+    }
+
+    function changeDbRowsPerPage() {
+        let el = document.getElementById('dbRowsPerPage');
+        if (el) {
+            window.dbRowsPerPage = parseInt(el.value, 10);
+            window.dbPage = 1;
+            renderDatabaseTable();
+        }
+    }
+
+    function filterDatabase() {
+        window.dbPage = 1;
+        renderDatabaseTable();
+    }
+
+    function changeDbPage(dir) {
+        window.dbPage += dir;
+        renderDatabaseTable();
+    }
+
+    function renderDatabaseTable() {
+        const tbody = document.getElementById('db-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = "";
+
+        if (!window.dbCache || window.dbCache.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#8a96a3;">No verified records found.</td></tr>';
+            let pag = document.getElementById('db-pagination');
+            if (pag) pag.style.display = 'none';
+            let foot = document.getElementById('db-footer-actions');
+            if (foot) foot.style.display = 'none';
+            return;
+        }
+
+        // Update Sort Direction Indicators on Headers
+        ['sn', 'siNo', 'customerName', 'tin', 'dateFrom', 'dateTo', 'incomePayment', 'atc', 'timestamp'].forEach(id => {
+            let icon = document.getElementById('sort-db-' + id);
+            if (icon) icon.innerText = '';
+        });
+        let activeIcon = document.getElementById('sort-db-' + window.dbSortCol);
+        if (activeIcon) activeIcon.innerText = window.dbSortAsc ? '▲' : '▼';
+
+        // Search Filter Across All Columns
+        let sq = document.getElementById('db-search-input') ? document.getElementById('db-search-input').value.toLowerCase().trim() : "";
+        let filtered = window.dbCache;
+        if (sq) {
+            filtered = window.dbCache.filter(r => 
+                String(r.sn || "").toLowerCase().includes(sq) ||
+                String(r.siNo || "").toLowerCase().includes(sq) ||
+                String(r.customerName || "").toLowerCase().includes(sq) ||
+                String(r.tin || "").toLowerCase().includes(sq) ||
+                String(r.dateFrom || "").toLowerCase().includes(sq) ||
+                String(r.dateTo || "").toLowerCase().includes(sq) ||
+                String(r.incomePayment || "").toLowerCase().includes(sq) ||
+                String(r.atc || "").toLowerCase().includes(sq) ||
+                String(r.timestamp || "").toLowerCase().includes(sq)
+            );
+        }
+
+        // Sorting Logic (Mathematical for Numbers & Dates, Alphabetical for Text)
+        let sorted = [...filtered];
+        sorted.sort((a, b) => {
+            let valA = a[window.dbSortCol];
+            let valB = b[window.dbSortCol];
+
+            if (window.dbSortCol === 'incomePayment') {
+                valA = parseFloat(String(valA).replace(/,/g, '')) || 0;
+                valB = parseFloat(String(valB).replace(/,/g, '')) || 0;
+            } else if (window.dbSortCol === 'sn') {
+                valA = parseInt(valA, 10) || 0;
+                valB = parseInt(valB, 10) || 0;
+            } else if (window.dbSortCol === 'dateFrom' || window.dbSortCol === 'dateTo' || window.dbSortCol === 'timestamp') {
+                valA = new Date(valA).getTime() || 0;
+                valB = new Date(valB).getTime() || 0;
+            } else {
+                valA = String(valA || "").toLowerCase();
+                valB = String(valB || "").toLowerCase();
+            }
+
+            if (valA < valB) return window.dbSortAsc ? -1 : 1;
+            if (valA > valB) return window.dbSortAsc ? 1 : -1;
+            return 0;
+        });
+
+        // Pagination Logic
+        let totalRows = sorted.length;
+        let totalPages = Math.ceil(totalRows / window.dbRowsPerPage);
+        if (window.dbPage < 1) window.dbPage = 1;
+        if (window.dbPage > totalPages && totalPages > 0) window.dbPage = totalPages;
+
+        let startIdx = (window.dbPage - 1) * window.dbRowsPerPage;
+        let endIdx = Math.min(startIdx + window.dbRowsPerPage, totalRows);
+        let paginated = sorted.slice(startIdx, endIdx);
+
+        if (paginated.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#8a96a3;">No matching records found.</td></tr>';
+            let pag = document.getElementById('db-pagination');
+            if (pag) pag.style.display = 'none';
+        } else {
+            paginated.forEach(r => {
+                let tr = document.createElement("tr");
+                let isPendingDelete = window.pendingDbDeletions.some(p => p.fileId === r.fileId);
+                
+                if (isPendingDelete) {
+                    tr.style.cssText = "background-color: #fff0f0; opacity: 0.7;";
+                }
+                let textDec = isPendingDelete ? "text-decoration: line-through;" : "";
+
+                let incomeAmt = parseFloat(String(r.incomePayment).replace(/,/g, '')) || 0;
+                let formattedAmt = incomeAmt.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+                let clientRole = 'Viewer';
+                try {
+                  let u = JSON.parse(sessionStorage.getItem('pf_user_data') || '{}');
+                  clientRole = u.role || 'Viewer';
+                } catch(e) {}
+
+                // STRICT ROLE MATRIX: Only Super Admin can delete; Viewers cannot edit
+                let canDeleteRecord = (clientRole === 'Super Admin');
+                let canEditRecord = (clientRole !== 'Viewer');
+
+                let deleteBtnHtml = canDeleteRecord ? `
+                    <button type="button" class="ewt-btn ewt-btn-force" onclick="stageDeleteRecord('${r.fileId}')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete
+                    </button>` : '';
+
+                let editBtnHtml = canEditRecord ? `
+                    <button type="button" class="ewt-btn ewt-btn-edit" onclick="editRecord('${r.fileId}')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit
+                    </button>` : '';
+
+                let actionBtns = isPendingDelete ? `
+                    <button type="button" class="ewt-btn ewt-btn-undo" onclick="undoDeleteRecord('${r.fileId}')">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg> Undo
+                    </button>` : `<div style="display:flex; gap:5px; justify-content:center;">${editBtnHtml}${deleteBtnHtml}</div>`;
+
+                if (!editBtnHtml && !deleteBtnHtml && !isPendingDelete) {
+                    actionBtns = '<span style="color:#8a96a3; font-size:11px; font-weight:700;">View Only</span>';
+                }
+
+                tr.innerHTML = `
+                    <td class="text-center" style="color:#8a96a3; font-weight:700; ${textDec}">${r.sn}</td>
+                    <td style="color:#1a73e8; font-weight:800; ${textDec}">${r.siNo || ''}</td>
+                    <td style="${textDec}">${r.customerName || ''}</td>
+                    <td style="${textDec}">${r.tin || ''}</td>
+                    <td style="${textDec}">${r.dateFrom || ''}</td>
+                    <td style="${textDec}">${r.dateTo || ''}</td>
+                    <td class="text-right" style="font-weight:800; color:var(--sidebar-bg); ${textDec}">PHP ${formattedAmt}</td>
+                    <td class="text-center" style="${textDec}">${r.atc || ''}</td>
+                    <td class="text-center" style="${textDec}">${r.timestamp || ''}</td>
+                    <td class="text-center">${actionBtns}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            let pag = document.getElementById('db-pagination');
+            if (pag) {
+                pag.style.display = 'flex';
+                document.getElementById('db-page-info').innerText = `Showing ${startIdx + 1} to ${endIdx} of ${totalRows} entries`;
+                document.getElementById('db-prev-btn').disabled = (window.dbPage === 1);
+                document.getElementById('db-next-btn').disabled = (window.dbPage === totalPages);
+            }
+        }
+
+        // Show/Hide Staged Deletion Bottom Bar
+        let footer = document.getElementById('db-footer-actions');
+        let saveBtn = document.getElementById('saveDbDeleteBtn');
+        if (footer && saveBtn) {
+            if (window.pendingDbDeletions.length > 0) {
+                footer.style.display = 'flex';
+                saveBtn.innerText = `Delete Selected (${window.pendingDbDeletions.length})`;
+            } else {
+                footer.style.display = 'none';
+            }
+        }
+    }
+
+    window.stageDeleteRecord = function(fileId) {
+        let record = window.dbCache.find(r => r.fileId === fileId);
+        if (record && !window.pendingDbDeletions.some(p => p.fileId === fileId)) {
+            window.pendingDbDeletions.push({ fileId: record.fileId, siNo: record.siNo });
+            renderDatabaseTable();
+        }
+    };
+
+    window.undoDeleteRecord = function(fileId) {
+        window.pendingDbDeletions = window.pendingDbDeletions.filter(p => p.fileId !== fileId);
+        renderDatabaseTable();
+    };
+
+    window.cancelDatabaseDeletions = function() {
+        window.pendingDbDeletions = [];
+        renderDatabaseTable();
+    };
+
+    window.commitDatabaseDeletions = function() {
+        if (!window.pendingDbDeletions || window.pendingDbDeletions.length === 0) return;
+        
+        let count = window.pendingDbDeletions.length;
+        if (!confirm(`Are you sure you want to permanently delete ${count} client 2307 record(s)? This will remove them from the database and recalculate all serial numbers.`)) return;
+
+        let saveBtn = document.getElementById('saveDbDeleteBtn');
+        let cancelBtn = document.getElementById('cancelDbDeleteBtn');
+        saveBtn.innerText = "Deleting... Please wait";
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                saveBtn.disabled = false;
+                cancelBtn.disabled = false;
+                if (res.success) {
+                    window.pendingDbDeletions = [];
+                    window.activityLogsCache = null; // Invalidate activity logs so new deletion entry appears
+                    loadDatabaseData(); // Fetch clean fresh data from Google Sheet
+                } else {
+                    alert("Error deleting records: " + res.error);
+                    renderDatabaseTable();
+                }
+            })
+            .withFailureHandler(function(err) {
+                saveBtn.disabled = false;
+                cancelBtn.disabled = false;
+                alert("Server Connection Error: " + err.message);
+                renderDatabaseTable();
+            })
+            .webappDeleteClient2307Batch(window.pendingDbDeletions, "<?= companyContext ?>", sessionStorage.getItem('pf_user_token'));
+    };
+
+    function editRecord(fileId) {
+        let record = window.dbCache.find(r => r.fileId === fileId);
+        if (!record) return;
+
+        let editItem = {
+            fileId: record.fileId,
+            driveFileId: record.driveFileId || "",
+            fileName: record.fileName,
+            pageNum: record.pageNum || 1,
+            rowSn: record.sn,
+            isSaved: true,
+            isArchiveEdit: true,
+            draft: {
+                dateFrom: record.dateFrom || "",
+                dateTo: record.dateTo || "",
+                siNo: record.siNo || "",
+                customer: record.customerName || "",
+                tin: record.tin || "",
+                address: record.address || "",
+                income: record.incomePayment || "",
+                atc: record.atc || "WC158",
+                receiveDate: record.receiveDate || "",
+                wc158: record.wc158 || "",
+                wc160: record.wc160 || "",
+                wc157: record.wc157 || "",
+                wc120: record.wc120 || "",
+                wc640: record.wc640 || "",
+                wc690: record.wc690 || "",
+                wv010: record.wv010 || "",
+                wv020: record.wv020 || "",
+                wi632: record.wi632 || ""
+            }
+        };
+
+        window.verificationQueue.unshift(editItem);
+        window.currentQueueIndex = 0;
+
+        switchTab('queue');
+        loadQueueItem();
+
+        // If the record has a permanent Google Drive File ID, fetch it and render on-screen!
+        if (record.driveFileId && record.driveFileId.length > 15 && !record.driveFileId.includes(".")) {
+            let loader = document.getElementById('img-loader');
+            let canvas = document.getElementById('pdf-preview-canvas');
+            let existingCard = document.getElementById('archive-placeholder-card');
+            
+            // Clean slate: Hide placeholder and canvas while actively fetching from Drive
+            if (existingCard) existingCard.remove();
+            if (canvas) canvas.style.display = 'none';
+            if (loader) {
+                loader.innerText = "Loading document from Google Drive...";
+                loader.style.display = "block";
+            }
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (loader) loader.style.display = 'none';
+
+                    if (res && res.success && res.base64) {
+                        let card = document.getElementById('archive-placeholder-card');
+                        if (card) card.remove();
+
+                        // 1. Single-page image rendering
+                        if (res.isImage) {
+                            let img = new Image();
+                            img.onload = function() {
+                                if (canvas) {
+                                    canvas.width = img.width;
+                                    canvas.height = img.height;
+                                    let ctx = canvas.getContext('2d');
+                                    ctx.drawImage(img, 0, 0);
+                                    canvas.style.display = 'block';
+                                }
+                            };
+                            img.src = "data:image/jpeg;base64," + res.base64;
+                        } else {
+                            // 2. Multi-page PDF rendering
+                            window.uploadedFileBytes[record.driveFileId] = res.base64;
+                            if (canvas) canvas.style.display = 'block';
+                            renderCurrentPdfPage(record.driveFileId, record.pageNum || 1);
+                        }
+                    } else {
+                        // File not found in Drive (older record) -> show clean archive card
+                        showHistoricalArchivePlaceholder();
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    if (loader) loader.style.display = 'none';
+                    showHistoricalArchivePlaceholder();
+                })
+                .webappGetDrivePdfBase64(record.driveFileId);
+        }
+    }
+
+    // --- ANALYTICS DASHBOARD LOGIC ---
+    let myAnalyticsChart = null;
+
+    function updateAnalytics() {
+        console.log("[TRACE] updateAnalytics called, dbCache length:", (window.dbCache || []).length);
+        let data = window.dbCache || [];
+        
+        let totalRecords = data.length;
+        let totalIncome = 0;
+        let totalTax = 0;
+        let monthlyData = {};
+
+        for (let i = 0; i < data.length; i++) {
+            let r = data[i];
+            let income = parseFloat(r.incomePayment) || 0;
+            totalIncome += income;
+
+            let tax = (parseFloat(r.wc158) || 0) + (parseFloat(r.wc157) || 0) + (parseFloat(r.wc160) || 0) +
+                      (parseFloat(r.wv010) || 0) + (parseFloat(r.wc120) || 0) + (parseFloat(r.wc640) || 0) +
+                      (parseFloat(r.wv020) || 0) + (parseFloat(r.wi632) || 0) + (parseFloat(r.wc690) || 0);
+            totalTax += tax;
+
+            if (r.timestamp) {
+                let dateObj = new Date(r.timestamp);
+                if (!isNaN(dateObj.getTime())) {
+                    let mKey = dateObj.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+                    if (!monthlyData[mKey]) monthlyData[mKey] = 0;
+                    monthlyData[mKey] += income;
+                }
+            }
+        }
+
+        // 1. Update text elements safely
+        let countEl = document.getElementById('stat-count');
+        if (countEl) countEl.innerText = totalRecords.toLocaleString();
+        
+        let incomeEl = document.getElementById('stat-income');
+        if (incomeEl) incomeEl.innerText = "PHP " + totalIncome.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        let taxEl = document.getElementById('stat-tax');
+        if (taxEl) taxEl.innerText = "PHP " + totalTax.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+        // 2. Chart Drawing Safety Net
+        let canvas = document.getElementById('clientChart');
+        if (!canvas) return; 
+
+        if (typeof Chart === 'undefined') {
+            setTimeout(updateAnalytics, 500); // Retry in 0.5s if Chart library isn't downloaded yet
+            return;
+        }
+
+        let ctx = canvas.getContext('2d');
+        if (window.myAnalyticsChart) window.myAnalyticsChart.destroy();
+
+        let labelsArr = Object.keys(monthlyData).reverse(); 
+        let valuesArr = labelsArr.map(k => monthlyData[k]);
+
+        window.myAnalyticsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labelsArr.length > 0 ? labelsArr : ['No Data'],
+                datasets: [{
+                    label: 'Total Income Payments',
+                    data: valuesArr.length > 0 ? valuesArr : [0],
+                    backgroundColor: '<?= themePrimary ?>',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { borderDash: [2, 4], color: '#eef2f7' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+  // --- EXCEL GENERATOR LOGIC ---
+    
+    // Initialize the Flatpickr Calendars robustly (prevents loading errors)
+    let fpInterval = setInterval(function() {
+        if (typeof flatpickr !== 'undefined') {
+            flatpickr(".date-input", { dateFormat: "m/d/Y", allowInput: true });
+            clearInterval(fpInterval);
+        }
+    }, 300);
+
+    // --- STABILIZED APP INITIALIZATION ---
+    // Runs immediately if the page has already finished loading (common in Apps Script,
+    // where our script finishes executing after the 'load' event has already fired).
+    // Falls back to the 'load' event listener only if the page is still loading.
+    function initializeApp() {
+        console.log("[TRACE] initializeApp running, readyState:", document.readyState);
+        loadSavedClientQueue();
+        switchTab('overview');
+    }
+
+    if (document.readyState === 'complete') {
+        initializeApp();
+    } else {
+        window.addEventListener('load', initializeApp);
+    }
+
+    // =========================================================================
+    // ACTIVITY LOGS CONTROLLER (MATCHED WITH PORTAL A)
+    // =========================================================================
+    window.activityLogsCache = null;
+    window.logCurrentPage = 1;
+    window.logRowsPerPage = 5;
+
+    function loadActivityLogs(isSilent = false) {
+        const timeline = document.getElementById('activity-timeline');
+        if (!isSilent && timeline) {
+            timeline.innerHTML = '<p style="color:#8a96a3; font-style:italic;"><i class="loader-spinner" style="width:14px; height:14px; margin-right:8px;"></i> Fetching latest activity logs...</p>';
+        }
+
+        google.script.run
+            .withSuccessHandler(function(logsData) {
+                window.activityLogsCache = Array.isArray(logsData) ? logsData : [];
+                populateLogActionDropdown(window.activityLogsCache);
+                filterActivityLogs();
+            })
+            .withFailureHandler(function(err) {
+                if (timeline) timeline.innerHTML = '<p style="color:#d93025;">Error loading logs: ' + err.message + '</p>';
+            })
+            .webappGetClientActivityLogs("<?= companyContext ?>");
+    }
+
+    function populateLogActionDropdown(logs) {
+        const dropdown = document.getElementById('logActionFilter');
+        if (!dropdown) return;
+        const currentVal = dropdown.value;
+        dropdown.innerHTML = '<option value="">All Actions</option>';
+        
+        const uniqueActions = [...new Set(logs.map(log => log.action))].sort();
+        uniqueActions.forEach(action => {
+            const opt = document.createElement('option');
+            opt.value = action;
+            opt.textContent = action;
+            dropdown.appendChild(opt);
+        });
+        dropdown.value = currentVal;
+    }
+
+    function changeLogRowsPerPage() {
+        let el = document.getElementById('logRowsPerPage');
+        if (el) {
+            window.logRowsPerPage = parseInt(el.value, 10);
+            window.logCurrentPage = 1;
+            filterActivityLogs();
+        }
+    }
+
+    function changeLogPage(direction) {
+        window.logCurrentPage += direction;
+        filterActivityLogs();
+    }
+
+    function filterActivityLogs() {
+        if (!window.activityLogsCache) return;
+        
+        const actionFilter = document.getElementById('logActionFilter') ? document.getElementById('logActionFilter').value : "";
+        const startStr = document.getElementById('logStartDate') ? document.getElementById('logStartDate').value : "";
+        const endStr = document.getElementById('logEndDate') ? document.getElementById('logEndDate').value : "";
+        const searchInput = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : "";
+        
+        let startDate = startStr ? new Date(startStr + " 00:00:00") : null;
+        let endDate = endStr ? new Date(endStr + " 23:59:59") : null;
+        
+        const filtered = window.activityLogsCache.filter(log => {
+            let logDate = new Date(log.timestamp);
+            
+            let matchAction = actionFilter === "" || log.action === actionFilter;
+            let matchStart = !startDate || logDate >= startDate;
+            let matchEnd = !endDate || logDate <= endDate;
+            let matchSearch = true;
+
+            if (searchInput) {
+                matchSearch = (
+                    String(log.action || '').toLowerCase().includes(searchInput) ||
+                    String(log.details || '').toLowerCase().includes(searchInput) ||
+                    String(log.user || '').toLowerCase().includes(searchInput) ||
+                    String(log.timestamp || '').toLowerCase().includes(searchInput)
+                );
+            }
+            
+            return matchAction && matchStart && matchEnd && matchSearch;
+        });
+        
+        let totalRows = filtered.length;
+        let totalPages = Math.ceil(totalRows / window.logRowsPerPage);
+        if (window.logCurrentPage < 1) window.logCurrentPage = 1;
+        if (window.logCurrentPage > totalPages && totalPages > 0) window.logCurrentPage = totalPages;
+        
+        let startIndex = (window.logCurrentPage - 1) * window.logRowsPerPage;
+        let endIndex = Math.min(startIndex + window.logRowsPerPage, totalRows);
+        let paginatedData = filtered.slice(startIndex, endIndex);
+
+        renderActivityLogs(paginatedData);
+
+        let paginationControls = document.getElementById('log-pagination-controls');
+        if (totalRows > 0 && paginationControls) {
+            paginationControls.style.display = 'flex';
+            document.getElementById('log-page-info').innerText = `Showing ${startIndex + 1} to ${endIndex} of ${totalRows} entries`;
+            document.getElementById('btn-log-prev').disabled = (window.logCurrentPage === 1);
+            document.getElementById('btn-log-next').disabled = (window.logCurrentPage === totalPages);
+        } else if (paginationControls) {
+            paginationControls.style.display = 'none';
+        }
+    }
+
+    function renderActivityLogs(logsData) {
+        const timeline = document.getElementById('activity-timeline');
+        if (!timeline) return;
+        timeline.innerHTML = '';
+        
+        if (!logsData || logsData.length === 0) {
+            timeline.innerHTML = '<p style="color:#8a96a3; font-style:italic; padding:15px 0;">No activity logs found matching your filters.</p>';
+            return;
+        }
+        
+        logsData.forEach(item => {
+            let actionColor = "#1a73e8"; // Blue (default / edit)
+            if (item.action.includes("Deleted")) actionColor = "#d93025"; // Red
+            if (item.action.includes("Skipped")) actionColor = "#f29900"; // Orange
+            if (item.action.includes("Saved") || item.action.includes("Created")) actionColor = "#1e8e3e"; // Green
+
+            let div = document.createElement('div');
+            div.className = 'timeline-item';
+            div.innerHTML = `
+                <div class="timeline-content" style="border-left: 4px solid ${actionColor};">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span class="timeline-date">${item.timestamp}</span>
+                        <span style="font-size: 11px; color: #8a96a3;">By: <strong>${item.user}</strong></span>
+                    </div>
+                    <h3 style="color: ${actionColor}; font-weight: 800;">${item.action}</h3>
+                    <p style="color: #495057;">${item.details}</p>
+                </div>
+            `;
+            timeline.appendChild(div);
+        });
+    }
+
+    function clearActivityFilters() {
+        if (document.getElementById('logActionFilter')) document.getElementById('logActionFilter').value = "";
+        if (document.getElementById('logSearchInput')) document.getElementById('logSearchInput').value = "";
+        
+        let startEl = document.getElementById('logStartDate');
+        let endEl = document.getElementById('logEndDate');
+        if (startEl && startEl._flatpickr) startEl._flatpickr.clear();
+        if (endEl && endEl._flatpickr) endEl._flatpickr.clear();
+        
+        filterActivityLogs();
+    }
+
+    function openDeleteLogsModal() {
+        const modal = document.getElementById('delete-logs-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            // Initialize the Calendar explicitly so the popup works cleanly and never overlaps
+            flatpickr("#delModalStartDate", { dateFormat: "m/d/Y", allowInput: true, disableMobile: true });
+            flatpickr("#delModalEndDate", { dateFormat: "m/d/Y", allowInput: true, disableMobile: true });
+        }
+    }
+
+    function closeDeleteLogsModal() {
+        const modal = document.getElementById('delete-logs-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function deleteActivityLogs() {
+        const startStr = document.getElementById('delModalStartDate').value;
+        const endStr = document.getElementById('delModalEndDate').value;
+        
+        if (!startStr || !endStr) {
+            alert("Please select both a Start Date and an End Date.");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to permanently delete all activity logs from ${startStr} to ${endStr}? This action cannot be undone.`)) {
+            return;
+        }
+
+        const btn = document.getElementById('confirmDeleteLogsBtn');
+        const origText = btn.innerText;
+        btn.innerText = "Deleting...";
+        btn.disabled = true;
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                btn.innerText = origText;
+                btn.disabled = false;
+                closeDeleteLogsModal();
+                
+                if (res.success) {
+                    alert(`Successfully deleted ${res.deleted} log entries.`);
+                    
+                    let sEl = document.getElementById('delModalStartDate');
+                    let eEl = document.getElementById('delModalEndDate');
+                    if (sEl && sEl._flatpickr) sEl._flatpickr.clear();
+                    if (eEl && eEl._flatpickr) eEl._flatpickr.clear();
+                    
+                    loadActivityLogs();
+                } else {
+                    alert("Error: " + res.error);
+                }
+            })
+            .withFailureHandler(function(err) {
+                btn.innerText = origText;
+                btn.disabled = false;
+                alert("Server Error: " + err.message);
+            })
+            .webappDeleteClientActivityLogs(startStr, endStr, "<?= companyContext ?>", sessionStorage.getItem('pf_user_token'));
+    }
+
+    // =========================================================================
+    // EWT CLIENT REPORT PREVIEW & EMAIL CONTROLLER (MATCHED WITH PURCHASE REPORT)
+    // =========================================================================
+    window.clientEwtPreviewData = null;
+    window.ewtcSortCol = 0; // Default to SN
+    window.ewtcSortAsc = true;
+    window.ewtcPage = 1;
+    window.ewtcRows = 5;
+
+    window.previewClientEwtReport = function() {
+        const startStr = document.getElementById("dl-start-date").value;
+        const endStr = document.getElementById("dl-end-date").value;
+        const statusDiv = document.getElementById("ewtClientStatusDiv");
+        const btn = document.getElementById("btn-preview-ewt");
+        const tableWrapper = document.getElementById("ewt-client-table-wrapper");
+
+        if (!startStr || !endStr) {
+            statusDiv.innerText = "Please select both Start and End dates.";
+            statusDiv.style.color = "#d93025";
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="loader-spinner" style="width:14px; height:14px; border-width:2px; margin:0 6px 0 0;"></span> Fetching Data...`;
+        statusDiv.innerText = "";
+        tableWrapper.style.display = "none";
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> Preview EWT Report`;
+                
+                if (res.error) {
+                    statusDiv.innerText = "Error: " + res.error;
+                    statusDiv.style.color = "#d93025";
+                    return;
+                }
+
+                if (!res.results || res.results.length === 0) {
+                    statusDiv.innerText = "No verified client 2307 records found for the selected date range.";
+                    statusDiv.style.color = "#8a96a3";
+                    return;
+                }
+
+                window.clientEwtPreviewData = res.results;
+                window.ewtcSortCol = 0;
+                window.ewtcSortAsc = true;
+                window.ewtcPage = 1;
+                if (document.getElementById('ewtClientSearchInput')) document.getElementById('ewtClientSearchInput').value = "";
+                
+                renderClientEwtTable();
+            })
+            .withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> Preview EWT Report`;
+                statusDiv.innerText = "Server Error: " + err.message;
+                statusDiv.style.color = "#d93025";
+            })
+            .webappPreviewClientEwtReport(startStr, endStr, "<?= companyContext ?>");
+    };
+
+    window.filterClientEwtTable = function() {
+        window.ewtcPage = 1;
+        renderClientEwtTable();
+    };
+
+    window.changeClientEwtRows = function() {
+        let el = document.getElementById('ewtClientRowsPerPage');
+        if (el) {
+            window.ewtcRows = parseInt(el.value, 10);
+            window.ewtcPage = 1;
+            renderClientEwtTable();
+        }
+    };
+
+    window.changeClientEwtPage = function(dir) {
+        window.ewtcPage += dir;
+        renderClientEwtTable();
+    };
+
+    window.sortClientEwtTable = function(colIndex) {
+        if (window.ewtcSortCol === colIndex) {
+            window.ewtcSortAsc = !window.ewtcSortAsc;
+        } else {
+            window.ewtcSortCol = colIndex;
+            window.ewtcSortAsc = true;
+        }
+        window.ewtcPage = 1;
+        renderClientEwtTable();
+    };
+
+    function renderClientEwtTable() {
+        const tbody = document.getElementById("ewt-client-tbody");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        let data = window.clientEwtPreviewData;
+
+        if (!data || data.length === 0) return;
+
+        // Reset sort icons
+        for (let idx = 0; idx <= 16; idx++) {
+            let icon = document.getElementById('sort-ewtc-' + idx);
+            if (icon) icon.innerText = '';
+        }
+        let activeIcon = document.getElementById('sort-ewtc-' + window.ewtcSortCol);
+        if (activeIcon) activeIcon.innerText = window.ewtcSortAsc ? '▲' : '▼';
+
+        // Search Filter Across Visible Columns
+        let sq = document.getElementById("ewtClientSearchInput") ? document.getElementById("ewtClientSearchInput").value.toLowerCase().trim() : "";
+        let filtered = [...data];
+        if (sq) {
+            filtered = filtered.filter(row => (
+                String(row[0] || '').toLowerCase().includes(sq) || // SN
+                String(row[1] || '').toLowerCase().includes(sq) || // SI No
+                String(row[2] || '').toLowerCase().includes(sq) || // Customer
+                String(row[3] || '').toLowerCase().includes(sq) || // TIN
+                String(row[4] || '').toLowerCase().includes(sq) || // Date From
+                String(row[5] || '').toLowerCase().includes(sq) || // Date To
+                String(row[6] || '').toLowerCase().includes(sq) || // Income Payment
+                String(row[7] || '').toLowerCase().includes(sq)    // ATC
+            ));
+        }
+
+        // Sort Logic
+        let sorted = filtered.sort((a, b) => {
+            let valA = a[window.ewtcSortCol];
+            let valB = b[window.ewtcSortCol];
+
+            // Numeric columns (SN, Income Payment, and all Tax columns)
+            if (window.ewtcSortCol === 0 || window.ewtcSortCol === 6 || (window.ewtcSortCol >= 8 && window.ewtcSortCol <= 16)) {
+                valA = Number(valA) || 0;
+                valB = Number(valB) || 0;
+            } else if (window.ewtcSortCol === 4 || window.ewtcSortCol === 5) {
+                // Dates
+                valA = new Date(valA).getTime() || 0;
+                valB = new Date(valB).getTime() || 0;
+            } else {
+                valA = String(valA || "").toLowerCase();
+                valB = String(valB || "").toLowerCase();
+            }
+
+            if (valA < valB) return window.ewtcSortAsc ? -1 : 1;
+            if (valA > valB) return window.ewtcSortAsc ? 1 : -1;
+            return 0;
+        });
+
+        // Pagination
+        let totalRows = sorted.length;
+        let totalPages = Math.ceil(totalRows / window.ewtcRows);
+        if (window.ewtcPage > totalPages && totalPages > 0) window.ewtcPage = totalPages;
+        if (window.ewtcPage < 1) window.ewtcPage = 1;
+
+        let startIdx = (window.ewtcPage - 1) * window.ewtcRows;
+        let paginated = sorted.slice(startIdx, startIdx + window.ewtcRows);
+
+        if (paginated.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="17" style="text-align:center; padding: 40px; color:#8a96a3;">No records match your search.</td></tr>';
+            document.getElementById('ewt-client-pagination').style.display = 'none';
+        } else {
+            paginated.forEach(row => {
+                let tr = document.createElement("tr");
+                let income = parseFloat(row[6]) || 0;
+
+                const fmtTax = (v) => {
+                    let num = parseFloat(v);
+                    return (!isNaN(num) && num > 0) ? num.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-';
+                };
+
+                tr.innerHTML = `
+                    <td class="text-center" style="color:#8a96a3; font-weight:700;">${row[0]}</td>
+                    <td style="color:#1a73e8; font-weight:800;">${row[1] || ''}</td>
+                    <td style="font-weight:700;">${row[2] || ''}</td>
+                    <td>${row[3] || ''}</td>
+                    <td>${row[4] || ''}</td>
+                    <td>${row[5] || ''}</td>
+                    <td class="text-right" style="color:var(--sidebar-bg); font-weight:800;">${income.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td class="text-center"><span class="badge-soft badge-secondary">${row[7] || 'N/A'}</span></td>
+                    <td class="text-right">${fmtTax(row[8])}</td>
+                    <td class="text-right">${fmtTax(row[9])}</td>
+                    <td class="text-right">${fmtTax(row[10])}</td>
+                    <td class="text-right">${fmtTax(row[11])}</td>
+                    <td class="text-right">${fmtTax(row[12])}</td>
+                    <td class="text-right">${fmtTax(row[13])}</td>
+                    <td class="text-right">${fmtTax(row[14])}</td>
+                    <td class="text-right">${fmtTax(row[15])}</td>
+                    <td class="text-right">${fmtTax(row[16])}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Grand Total Row on the last page
+            if (window.ewtcPage === totalPages) {
+                let totIncome = 0;
+                let taxTotals = Array(9).fill(0);
+
+                filtered.forEach(row => {
+                    totIncome += (parseFloat(row[6]) || 0);
+                    for (let t = 0; t < 9; t++) {
+                        taxTotals[t] += (parseFloat(row[8 + t]) || 0);
+                    }
+                });
+
+                let trTot = document.createElement("tr");
+                trTot.style.backgroundColor = "#f8f9fa";
+                
+                let taxCellsHtml = taxTotals.map(amt => `
+                    <td class="text-right" style="font-weight:800; color:var(--sidebar-bg); border-top:2px solid #eef2f7;">
+                        ${amt > 0 ? amt.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}
+                    </td>
+                `).join('');
+
+                trTot.innerHTML = `
+                    <td colspan="6" class="text-right" style="font-weight:800; color:var(--sidebar-bg); font-size:13.5px;">GRAND TOTAL:</td>
+                    <td class="text-right" style="font-weight:800; color:var(--sidebar-bg); border-top:2px solid #eef2f7;">${totIncome.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td></td>
+                    ${taxCellsHtml}
+                `;
+                tbody.appendChild(trTot);
+            }
+
+            document.getElementById('ewt-client-pagination').style.display = 'flex';
+            let eIdx = Math.min(startIdx + window.ewtcRows, totalRows);
+            document.getElementById('ewt-client-page-info').innerText = `Showing ${startIdx + 1} to ${eIdx} of ${totalRows} records`;
+            document.getElementById('btn-ewtc-prev').disabled = (window.ewtcPage === 1);
+            document.getElementById('btn-ewtc-next').disabled = (window.ewtcPage === totalPages);
+        }
+
+        let cRole = 'Viewer';
+        try { cRole = JSON.parse(sessionStorage.getItem('pf_user_data') || '{}').role || 'Viewer'; } catch(e) {}
+        const clientEmailBtn = document.getElementById("btn-email-client-ewt");
+        if (clientEmailBtn) clientEmailBtn.style.display = (cRole === 'Viewer') ? 'none' : 'inline-flex';
+
+        document.getElementById("ewt-client-table-wrapper").style.display = "block";
+    }
+
+    window.emailClientEwtReport = function() {
+        const startStr = document.getElementById("dl-start-date").value;
+        const endStr = document.getElementById("dl-end-date").value;
+        const btn = document.getElementById("btn-email-client-ewt");
+        const statusDiv = document.getElementById("ewtClientStatusDiv");
+
+        if (!window.clientEwtPreviewData || window.clientEwtPreviewData.length === 0) return;
+
+        if (!confirm("Are you sure you want to generate and email the EWT Client Report?")) return;
+
+        btn.disabled = true;
+        btn.innerHTML = `<span class="loader-spinner" style="width:14px; height:14px; border-width:2px; margin:0 6px 0 0;"></span> Generating & Sending...`;
+        statusDiv.innerText = "Generating Excel file, encrypting, and emailing recipients...";
+        statusDiv.style.color = "#1a73e8";
+
+        google.script.run
+            .withSuccessHandler(function(res) {
+                btn.disabled = false;
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg> Email EWT Client Excel`;
+                
+                if (res.success) {
+                    if (res.base64) {
+                        let a = document.createElement("a");
+                        a.href = "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64," + res.base64;
+                        a.download = res.fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                    }
+                    statusDiv.innerText = "Success! The EWT Client Report has been generated, downloaded, and emailed.";
+                    statusDiv.style.color = "#1e7e34";
+                } else {
+                    statusDiv.innerText = "Error: " + res.error;
+                    statusDiv.style.color = "#d93025";
+                }
+            })
+            .withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerHTML = `Email EWT Client Excel`;
+                statusDiv.innerText = "System Error: " + err.message;
+                statusDiv.style.color = "#d93025";
+            })
+            .webappGenerateAndEmailClientEwtReport(window.clientEwtPreviewData, startStr, endStr, "<?= companyContext ?>", sessionStorage.getItem('pf_user_token'));
+    };
+  </script>
+</body>
+</html>
