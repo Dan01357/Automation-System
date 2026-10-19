@@ -2419,11 +2419,6 @@ function _31_importAEEmails(e) {
 
 function _39_importNewNarraReport(e) {
   var isBackground = (e && e.triggerUid);
-  var lock = null;
-  if (!isBackground) {
-    lock = LockService.getScriptLock();
-    try { lock.waitLock(10000); } catch (err) { throw new Error("System is currently busy."); }
-  }
   try {
     const startTime = Date.now();
     deleteTriggersByName("_39_importNewNarraReport");
@@ -2596,7 +2591,7 @@ function _39_importNewNarraReport(e) {
     }
     ss.toast(`New Narra Import Complete. Files: ${filesProcessed}`, "SUCCESS", 5);
   } finally {
-    if (lock) lock.releaseLock();
+    // Non-blocking background execution
   }
 }
 
@@ -5774,13 +5769,12 @@ function resumeUnpaidDRCustomerBatch() {
                  } catch(e) {}
 
                  let xmasPdfBlob = null;
-                 let xmasPdfBlob2 = null;
                  try {
                      let props = PropertiesService.getScriptProperties();
                      let isDevMode = ScriptApp.getService().getUrl().endsWith("/dev");
                      let entityName = isTech ? "A2Z2GO" : "Pingcon";
 
-                     // --- ATTACHMENT 1: Primary Catalog Flyer ---
+                     // Single Marketing Flyer Attachment
                      let propKey1 = isTech 
                          ? (isDevMode && props.getProperty('MARKETING_PDF_XMAS_A2Z_ID_DEV') ? 'MARKETING_PDF_XMAS_A2Z_ID_DEV' : 'MARKETING_PDF_XMAS_A2Z_ID')
                          : (isDevMode && props.getProperty('MARKETING_PDF_XMAS_PINGCON_ID_DEV') ? 'MARKETING_PDF_XMAS_PINGCON_ID_DEV' : 'MARKETING_PDF_XMAS_PINGCON_ID');
@@ -5800,45 +5794,14 @@ function resumeUnpaidDRCustomerBatch() {
 
                          if (fileMime1 === MimeType.PDF || fileNameLower1.endsWith(".pdf")) {
                              xmasPdfBlob = rawBlob1.getAs(MimeType.PDF);
-                             xmasPdfBlob.setName(`Christmas_Baskets_Catalog_${entityName}.pdf`);
+                             xmasPdfBlob.setName(`Christmas_Flyer_${entityName}.pdf`);
                          } else {
                              let ext1 = "jpg";
                              if (fileMime1.includes("png") || fileNameLower1.endsWith(".png")) ext1 = "png";
                              else if (fileMime1.includes("jpeg") || fileMime1.includes("jpg") || fileNameLower1.endsWith(".jpg") || fileNameLower1.endsWith(".jpeg")) ext1 = "jpg";
 
                              xmasPdfBlob = rawBlob1;
-                             xmasPdfBlob.setName(`Christmas_Baskets_Catalog_${entityName}.${ext1}`);
-                         }
-                     }
-
-                     // --- ATTACHMENT 2: Secondary Catalog Flyer ---
-                     let propKey2 = isTech 
-                         ? (isDevMode && props.getProperty('MARKETING_PDF_XMAS_2_A2Z_ID_DEV') ? 'MARKETING_PDF_XMAS_2_A2Z_ID_DEV' : 'MARKETING_PDF_XMAS_2_A2Z_ID')
-                         : (isDevMode && props.getProperty('MARKETING_PDF_XMAS_2_PINGCON_ID_DEV') ? 'MARKETING_PDF_XMAS_2_PINGCON_ID_DEV' : 'MARKETING_PDF_XMAS_2_PINGCON_ID');
-
-                     let xmasPdfId2 = props.getProperty(propKey2);
-                     if (!xmasPdfId2 && isDevMode) {
-                         xmasPdfId2 = isTech
-                             ? props.getProperty('MARKETING_PDF_XMAS_2_A2Z_ID')
-                             : props.getProperty('MARKETING_PDF_XMAS_2_PINGCON_ID');
-                     }
-
-                     if (xmasPdfId2 && !xmasPdfId2.includes("INSERT")) {
-                         let fileObj2 = DriveApp.getFileById(xmasPdfId2);
-                         let rawBlob2 = fileObj2.getBlob();
-                         let fileMime2 = (rawBlob2.getContentType() || "").toLowerCase();
-                         let fileNameLower2 = fileObj2.getName().toLowerCase();
-
-                         if (fileMime2 === MimeType.PDF || fileNameLower2.endsWith(".pdf")) {
-                             xmasPdfBlob2 = rawBlob2.getAs(MimeType.PDF);
-                             xmasPdfBlob2.setName(`Christmas_Baskets_Catalog_2_${entityName}.pdf`);
-                         } else {
-                             let ext2 = "jpg";
-                             if (fileMime2.includes("png") || fileNameLower2.endsWith(".png")) ext2 = "png";
-                             else if (fileMime2.includes("jpeg") || fileMime2.includes("jpg") || fileNameLower2.endsWith(".jpg") || fileNameLower2.endsWith(".jpeg")) ext2 = "jpg";
-
-                             xmasPdfBlob2 = rawBlob2;
-                             xmasPdfBlob2.setName(`Christmas_Baskets_Catalog_2_${entityName}.${ext2}`);
+                             xmasPdfBlob.setName(`Christmas_Flyer_${entityName}.${ext1}`);
                          }
                      }
                  } catch(e) { console.warn("Failed to fetch Christmas marketing attachment: " + e); }
@@ -5947,9 +5910,11 @@ function resumeUnpaidDRCustomerBatch() {
                      }
                  }
                  
+                 let caMobile = PropertiesService.getScriptProperties().getProperty('COLLECTION_ASSISTANT_MOBILE') || "";
+                 let mobileLine = caMobile ? `Mobile: ${caMobile}<br>` : "";
                  let collectionAsstHtml = "";
                  [...new Set(collectionAssts)].forEach(asst => {
-                     collectionAsstHtml += `Expanding Withholding Tax Submission Collection Assistant in-charge: ${asst}<br>`;
+                     collectionAsstHtml += `BIR Form 2307 Expanded Withholding Tax (EWT), Collection Assistant in-charge: ${asst}<br>${mobileLine}`;
                  });
 
                  let feedbackLink = isTech ? (SCRIPT_PROPS['FEEDBACK_LINK_TECH'] || "") : (SCRIPT_PROPS['FEEDBACK_LINK_PINGCON'] || "");
@@ -5982,12 +5947,9 @@ function resumeUnpaidDRCustomerBatch() {
                  from: senderEmail, cc: ccRecipients, name: senderName,
                  attachments: [securedBlob], inlineImages: {}, throwError: true
              };
-             // Add the dynamically fetched and named Christmas attachments to the email array
+             // Single Flyer Attachment
              if (xmasPdfBlob) {
                  emailOptions.attachments.push(xmasPdfBlob);
-             }
-             if (xmasPdfBlob2) {
-                 emailOptions.attachments.push(xmasPdfBlob2);
              }
              if (chartBlob) emailOptions.inlineImages.chartImage = chartBlob;
              if (feedbackImgBlob) emailOptions.inlineImages.feedbackImage = feedbackImgBlob;
@@ -8876,7 +8838,7 @@ function _buildAndShowDialog(title, btnText, srvFunc, hasAe, hasReq, h) {
 // WEB APP BACKEND HANDLERS
 // =========================================================================
 
-function webappUploadFile(fileData, fileName, importType) {
+function webappUploadFile(fileData, fileName, importType, sessionToken = null) {
   try {
     let folderId;
     switch(importType) {
@@ -8892,7 +8854,15 @@ function webappUploadFile(fileData, fileName, importType) {
       case "SCANNED": folderId = SUPPLIER_RECEIPT_FOLDER_ID; break; 
       case "AE_EMAILS": folderId = AE_EMAILS_FOLDER_ID; break; 
       case "CPP": folderId = CPP_FOLDER_ID; break;
-      case "NEW_NARRA": folderId = NEW_NARRA_FOLDER_ID; break; // <--- ADD THIS LINE
+      case "NEW_NARRA": {
+        let isDev = false;
+        try { isDev = ScriptApp.getService().getUrl().toLowerCase().endsWith("/dev"); } catch(e){}
+        let props = PropertiesService.getScriptProperties();
+        folderId = (isDev && props.getProperty('NEW_NARRA_FOLDER_ID_DEV'))
+          ? props.getProperty('NEW_NARRA_FOLDER_ID_DEV')
+          : NEW_NARRA_FOLDER_ID;
+        break;
+      }
       case "NARRA_VOUCHER": 
       case "CHECK_SUMMARY": 
       case "RIWB": 
@@ -8917,6 +8887,10 @@ function webappUploadFile(fileData, fileName, importType) {
     
     let blob = Utilities.newBlob(Utilities.base64Decode(dataStr), mimeType, fileName);
     DriveApp.getFolderById(folderId).createFile(blob);
+
+    if (importType === "NEW_NARRA") {
+      logNarraActivity("Uploaded Narra Database", `Uploaded raw file: ${fileName}`, sessionToken);
+    }
     
     return "Success";
   } catch(e) {
@@ -8930,64 +8904,57 @@ function webappUploadFile(fileData, fileName, importType) {
   }
 }
 
-function webappRequestUploadLock() {
-  console.log("[DEBUG] Starting webappRequestUploadLock...");
-  console.time("webappRequestUploadLock");
-  var lock = LockService.getScriptLock();
+// --- DOMAIN-ISOLATED LOCK ENGINE (PREVENTS CROSS-PORTAL BLOCKING) ---
+function _getPortalLockPrefix(portalModule = "MAIN") {
+  let isDev = false;
+  try { isDev = ScriptApp.getService().getUrl().toLowerCase().endsWith("/dev"); } catch(e){}
+  let env = isDev ? "DEV" : "EXEC";
+  let rawMod = String(portalModule || "MAIN").toUpperCase().trim();
+  let mod = "MAIN";
+  if (rawMod.includes("NARRA")) mod = "NARRA";
+  else if (rawMod.includes("CLIENT")) mod = "CLIENT";
+  else if (rawMod.includes("SUPPLIER") || rawMod.includes("2307") || rawMod.includes("INVOICE")) mod = "SUPPLIER";
+  return `${env}_LOCK_${mod}`;
+}
+
+function webappRequestUploadLock(portalModule = "MAIN") {
   try {
-    console.log("[DEBUG] Acquiring Lock...");
-    lock.waitLock(1000); 
-    lock.releaseLock(); 
-    console.log("[DEBUG] Lock Acquired and Released.");
-  } catch (e) {
-    console.error("[DEBUG] Lock BUSY.");
-    console.timeEnd("webappRequestUploadLock");
-    return "BUSY";
-  }
-  
-  try {
-    console.log("[DEBUG] Accessing PropertiesService...");
-    var props = PropertiesService.getScriptProperties();
+    let prefix = _getPortalLockPrefix(portalModule);
+    let cache = CacheService.getScriptCache();
     
-    console.log("[DEBUG] Reading ONGOING_REPORT_TYPE...");
-    var ongoingReport = props.getProperty("ONGOING_REPORT_TYPE");
+    // Only inspect the lock assigned to this specific portal and environment
+    if (cache.get(prefix + "_UPLOAD") === "true") {
+      return "BUSY"; 
+    }
     
-    console.log("[DEBUG] Reading ONGOING_REPORT_TIMESTAMP...");
-    var ongoingTimestamp = props.getProperty("ONGOING_REPORT_TIMESTAMP");
+    let props = PropertiesService.getScriptProperties();
+    let ongoingReport = props.getProperty(prefix + "_REPORT_TYPE");
+    let ongoingTimestamp = props.getProperty(prefix + "_REPORT_TIMESTAMP");
     
     if (ongoingReport && ongoingReport.trim() !== "") {
-        console.log("[DEBUG] Found ongoing report: " + ongoingReport);
         if (ongoingTimestamp && (Date.now() - parseInt(ongoingTimestamp) > 360000)) {
-            console.log("[DEBUG] Stale lock detected. Clearing...");
-            clearReportLock();
+            clearReportLock(portalModule);
             ongoingReport = null;
         } else {
-            console.timeEnd("webappRequestUploadLock");
             return "BUSY_REPORT";
         }
     }
     
-    console.log("[DEBUG] Accessing CacheService...");
-    var cache = CacheService.getScriptCache();
-    if (cache.get("GLOBAL_UPLOAD_LOCK") === "true") {
-      console.log("[DEBUG] GLOBAL_UPLOAD_LOCK is true.");
-      console.timeEnd("webappRequestUploadLock");
-      return "BUSY"; 
-    }
-    
-    console.log("[DEBUG] RequestUploadLock SUCCESS.");
-    console.timeEnd("webappRequestUploadLock");
     return "SUCCESS";
   } catch (err) {
-    console.error("[DEBUG] FATAL ERROR inside webappRequestUploadLock: " + err.message);
-    throw err;
+    console.error("Lock check error: " + err.message);
+    return "SUCCESS";
   }
 }
-function webappSetUploadLock() {
-  CacheService.getScriptCache().put("GLOBAL_UPLOAD_LOCK", "true", 300);
+
+function webappSetUploadLock(portalModule = "MAIN") {
+  let prefix = _getPortalLockPrefix(portalModule);
+  CacheService.getScriptCache().put(prefix + "_UPLOAD", "true", 300);
 }
-function webappReleaseUploadLock() {
-  CacheService.getScriptCache().remove("GLOBAL_UPLOAD_LOCK");
+
+function webappReleaseUploadLock(portalModule = "MAIN") {
+  let prefix = _getPortalLockPrefix(portalModule);
+  CacheService.getScriptCache().remove(prefix + "_UPLOAD");
 }
 
 function webappTriggerReport(action, startDateStr, endDateStr, selectedEntities, selectedAEs, isTestMode, selectedBanks) {
@@ -9001,18 +8968,19 @@ function webappTriggerReport(action, startDateStr, endDateStr, selectedEntities,
 
     const props = PropertiesService.getScriptProperties();
     
+    let portalMod = (action === "NIGHTLY_NARRA") ? "NARRA" : "MAIN";
+    let prefix = _getPortalLockPrefix(portalMod);
+
     if (action !== "EWT_SUPPLIER_REPORT") {
-        console.log("[DEBUG] Checking for existing ONGOING_REPORT_TYPE...");
-        if (props.getProperty("ONGOING_REPORT_TYPE")) {
-            return "Error: A report (" + props.getProperty("ONGOING_REPORT_TYPE") + ") is currently ongoing. Please wait for it to finish or click Cancel Batch.";
+        if (props.getProperty(prefix + "_REPORT_TYPE")) {
+            return "Error: A report (" + props.getProperty(prefix + "_REPORT_TYPE") + ") is currently ongoing on this portal. Please wait for it to finish or click Cancel Batch.";
         }
-        console.log("[DEBUG] Setting new ONGOING_REPORT_TYPE...");
-        props.setProperty("ONGOING_REPORT_TYPE", action);
-        props.setProperty("ONGOING_REPORT_STATUS", "Processing " + action + " in background...");
-        props.setProperty("ONGOING_REPORT_TIMESTAMP", Date.now().toString());
-        props.setProperty("THREAD_STATE", "RUNNING");
-        props.deleteProperty("RESUME_TIME");
-        props.deleteProperty("LAST_RUN_ERROR");
+        props.setProperty(prefix + "_REPORT_TYPE", action);
+        props.setProperty(prefix + "_REPORT_STATUS", "Processing " + action + " in background...");
+        props.setProperty(prefix + "_REPORT_TIMESTAMP", Date.now().toString());
+        props.setProperty(prefix + "_THREAD_STATE", "RUNNING");
+        props.deleteProperty(prefix + "_RESUME_TIME");
+        props.deleteProperty(prefix + "_LAST_RUN_ERROR");
     }
     
     console.log("[DEBUG] Saving basic props...");
@@ -9103,38 +9071,50 @@ function webappTriggerReport(action, startDateStr, endDateStr, selectedEntities,
   }
 }
 
-function webappCancelReport() {
+function webappCancelReport(portalModule = "MAIN") {
   try {
     const props = PropertiesService.getScriptProperties();
+    let mod = String(portalModule || "MAIN").toUpperCase().trim();
+    let prefix = _getPortalLockPrefix(mod);
+    
+    CacheService.getScriptCache().remove(prefix + "_UPLOAD");
     CacheService.getScriptCache().remove("GLOBAL_UPLOAD_LOCK");
     
-    let ongoingType = props.getProperty("ONGOING_REPORT_TYPE");
-    let threadState = props.getProperty("THREAD_STATE"); // Detects if actively writing an Excel file
-    
-    const batchTriggers = ["resumeUnpaidDRBatch", "resumeUnpaidDRCustomerBatch", "resumeUnpaidDROverdueBatch", "resumeSalesReportConsolidatedBatch", "resumeBuySellBatch", "resumeCommissionBatch", "resumePurchaseBatch", "resumeEwtClientBatch", "resumeCheckPOPaymentBatch", "resumeCPPBatch", "resumeNightlyNarraBatch", "resumeEwtSupplierBatch"];
-    const cancelKeys = ["CANCEL_UNPAID_DR", "CANCEL_UNPAID_DR_CUSTOMER", "CANCEL_UNPAID_DR_OVERDUE", "CANCEL_SALES_REPORT_CONSOLIDATED", "CANCEL_BUY_SELL", "CANCEL_COMM", "CANCEL_PURCHASE", "CANCEL_EWT_CLIENT", "CANCEL_CHECK_PO_PAYMENT", "CANCEL_CPP", "CANCEL_NIGHTLY_NARRA", "CANCEL_EWT_SUPPLIER"];
+    // 1. ISOLATED NIGHTLY NARRA CANCELLATION (NEVER TOUCHES MAIN PORTAL OR SOA)
+    if (mod === "NARRA") {
+      deleteTriggersByName("resumeNightlyNarraBatch");
+      props.deleteProperty("PENDING_NIGHTLY_NARRA");
+      props.deleteProperty("CANCEL_NIGHTLY_NARRA");
+      clearReportLock("NARRA");
+      return "Success: Nightly Narra batch cancelled and portal unlocked.";
+    }
+
+    // 2. MAIN WEBSITE CANCELLATION
+    let ongoingType = props.getProperty(prefix + "_REPORT_TYPE") || props.getProperty("ONGOING_REPORT_TYPE");
+    let threadState = props.getProperty(prefix + "_THREAD_STATE") || props.getProperty("THREAD_STATE");
+
+    const batchTriggers = ["resumeUnpaidDRBatch", "resumeUnpaidDRCustomerBatch", "resumeUnpaidDROverdueBatch", "resumeSalesReportConsolidatedBatch", "resumeBuySellBatch", "resumeCommissionBatch", "resumePurchaseBatch", "resumeEwtClientBatch", "resumeCheckPOPaymentBatch", "resumeCPPBatch", "resumeEwtSupplierBatch"];
+    const cancelKeys = ["CANCEL_UNPAID_DR", "CANCEL_UNPAID_DR_CUSTOMER", "CANCEL_UNPAID_DR_OVERDUE", "CANCEL_SALES_REPORT_CONSOLIDATED", "CANCEL_BUY_SELL", "CANCEL_COMM", "CANCEL_PURCHASE", "CANCEL_EWT_CLIENT", "CANCEL_CHECK_PO_PAYMENT", "CANCEL_CPP", "CANCEL_EWT_SUPPLIER"];
     const keysToNuke = [
       "PENDING_AES_UNPAID_DR", "PENDING_CUSTOMERS_UNPAID_DR", "PENDING_ENTITIES_UNPAID_OVERDUE", "PENDING_AES_SALES_REPORT_CONSOLIDATED", "MISSING_QUOTAS_SALES", "PENDING_AES_BUY_SELL", 
       "PENDING_AES_COMM", "PENDING_AES_PURCHASE", "PENDING_EWT_CLIENT", 
-      "ONGOING_REPORT_TYPE", "ONGOING_REPORT_STATUS", "SALES_TARGET_AES", "SALES_TARGET_CUSTOMERS", "RESUME_TIME", "PENDING_CUSTOMERS_CPP", "LAST_RUN_ERROR", "PENDING_NIGHTLY_NARRA", "THREAD_STATE"
+      "SALES_TARGET_AES", "SALES_TARGET_CUSTOMERS", "RESUME_TIME", "PENDING_CUSTOMERS_CPP", "LAST_RUN_ERROR"
     ];
 
     if (ongoingType) {
         sendBatchSuccessSummary(true, ongoingType);
     }
 
-    // IF ACTIVELY GENERATING A FILE: Set cancel flags but keep UI locked until it stops safely.
     if (threadState === "RUNNING") {
         cancelKeys.forEach(k => props.setProperty(k, "true"));
-        props.setProperty("ONGOING_REPORT_STATUS", "Cancelling... Waiting for current file to finish safely.");
-        return "Cancellation requested. The UI will unlock as soon as the current file finishes generating (usually a few seconds).";
-    } 
-    // IF SLEEPING OR IDLE: Nuke everything instantly.
-    else {
+        props.setProperty(prefix + "_REPORT_STATUS", "Cancelling... Waiting for current file to finish safely.");
+        return "Cancellation requested. The UI will unlock as soon as the current file finishes generating.";
+    } else {
         batchTriggers.forEach(t => deleteTriggersByName(t));
         keysToNuke.forEach(k => props.deleteProperty(k));
         cancelKeys.forEach(k => props.deleteProperty(k));
-        return "Success: All ongoing reports and delayed tasks have been successfully cancelled. System unlocked instantly.";
+        clearReportLock("MAIN");
+        return "Success: Main portal reports cancelled and unlocked.";
     }
   } catch(e) {
     return "Error: " + e.message;
@@ -9243,9 +9223,13 @@ function webappProcessStuckFiles(importType) {
   
   if (count === 0) return "NO_FILES";
   
+  let targetPortal = "MAIN";
+  if (importType === "NEW_NARRA") targetPortal = "NARRA";
+  else if (importType === "NARRA_VOUCHER" || importType === "CHECK_SUMMARY" || importType === "RIWB") targetPortal = "SUPPLIER";
+
   if (funcToRun) {
-     CacheService.getScriptCache().put("GLOBAL_UPLOAD_LOCK", "true", 300);
-     try { funcToRun(); } finally { CacheService.getScriptCache().remove("GLOBAL_UPLOAD_LOCK"); }
+     webappSetUploadLock(targetPortal);
+     try { funcToRun(); } finally { webappReleaseUploadLock(targetPortal); }
   }
   return count;
 }
@@ -9862,45 +9846,62 @@ function _resumeBuySellCommCore(batchKey, triggerName, cancelKey, isCommission) 
 
 
 
-function webappGetReportStatus() {
+function webappGetReportStatus(portalModule = "MAIN") {
   const props = PropertiesService.getScriptProperties();
   let quota = "Error";
   try { quota = MailApp.getRemainingDailyQuota(); } catch(e) { quota = "Auth Error"; }
   
-  let type = props.getProperty("ONGOING_REPORT_TYPE");
-  let ts = props.getProperty("ONGOING_REPORT_TIMESTAMP");
-  let resumeTime = props.getProperty("RESUME_TIME");
+  let mod = String(portalModule || "MAIN").toUpperCase().trim();
+  let prefix = _getPortalLockPrefix(mod);
   
-  // Base timeout on the last trigger schedule, or the start time.
+  // Checks environment-isolated keys first, with safe fallback to legacy keys
+  let type = props.getProperty(prefix + "_REPORT_TYPE") || props.getProperty("ONGOING_REPORT_TYPE");
+  let status = props.getProperty(prefix + "_REPORT_STATUS") || props.getProperty("ONGOING_REPORT_STATUS");
+  let ts = props.getProperty(prefix + "_REPORT_TIMESTAMP") || props.getProperty("ONGOING_REPORT_TIMESTAMP");
+  let resumeTime = props.getProperty(prefix + "_RESUME_TIME") || props.getProperty("RESUME_TIME");
+  let lastError = props.getProperty(prefix + "_LAST_RUN_ERROR") || props.getProperty("LAST_RUN_ERROR");
+  
   let lastActive = ts ? parseInt(ts) : 0;
   if (resumeTime && parseInt(resumeTime) > lastActive) {
       lastActive = parseInt(resumeTime);
   }
   
-  // Clean up frontend polling if a dead lock is detected (> 15 mins)
+  // Stale lock cleanup (> 15 mins) specifically for this portal
   if (type && lastActive > 0 && (Date.now() - lastActive > 900000)) {
-      clearReportLock();
+      clearReportLock(mod);
       type = null;
   }
   
   return { 
     type: (type && type.trim() !== "") ? type : null, 
-    status: props.getProperty("ONGOING_REPORT_STATUS"),
+    status: status,
     resumeTime: resumeTime,
-    lastError: props.getProperty("LAST_RUN_ERROR"),
+    lastError: lastError,
     emailQuota: quota
   };
 }
 
-function clearReportLock() {
+function clearReportLock(portalModule = "MAIN") {
   const props = PropertiesService.getScriptProperties();
-  props.deleteProperty("TEST_MODE"); // Clear Test Mode when batch finishes or cancels
-  props.deleteProperty("ONGOING_REPORT_TYPE");
-  props.deleteProperty("ONGOING_REPORT_STATUS");
-  props.deleteProperty("RESUME_TIME");
-  props.deleteProperty("ONGOING_REPORT_TIMESTAMP");
-  props.deleteProperty("THREAD_STATE"); // Cleans up the thread state
-  CacheService.getScriptCache().remove("GLOBAL_UPLOAD_LOCK");
+  let prefix = _getPortalLockPrefix(portalModule);
+
+  props.deleteProperty(prefix + "_REPORT_TYPE");
+  props.deleteProperty(prefix + "_REPORT_STATUS");
+  props.deleteProperty(prefix + "_RESUME_TIME");
+  props.deleteProperty(prefix + "_REPORT_TIMESTAMP");
+  props.deleteProperty(prefix + "_THREAD_STATE");
+
+  let rawMod = String(portalModule || "MAIN").toUpperCase().trim();
+  if (rawMod === "MAIN") {
+    props.deleteProperty("TEST_MODE");
+    props.deleteProperty("ONGOING_REPORT_TYPE");
+    props.deleteProperty("ONGOING_REPORT_STATUS");
+    props.deleteProperty("RESUME_TIME");
+    props.deleteProperty("ONGOING_REPORT_TIMESTAMP");
+    props.deleteProperty("THREAD_STATE");
+  }
+
+  CacheService.getScriptCache().remove(prefix + "_UPLOAD");
 }
 
 // =========================================================================
@@ -9986,11 +9987,18 @@ function _getPortalRolesSheet(portalType = "SUPPLIER") {
   let targetFolderId = null;
   const pType = String(portalType).toUpperCase().trim();
 
-  // Dynamic Routing across the 4 quadrants using Script Properties
+  // Dynamic Routing across portals using Script Properties
+  let targetSheetName = "Portal_User_Roles";
+
   if (pType.includes("CLIENT")) {
     targetFolderId = isDevMode 
       ? props.getProperty('CLIENT_ROLES_FOLDER_ID_DEV') 
       : props.getProperty('CLIENT_ROLES_FOLDER_ID_EXEC');
+  } else if (pType.includes("NARRA")) {
+    targetSheetName = "Portal_User_Roles_Narra";
+    targetFolderId = isDevMode 
+      ? (props.getProperty('DATABASE_FOLDER_ID_DEV') || props.getProperty('DATABASE_FOLDER_ID'))
+      : (props.getProperty('DATABASE_FOLDER_ID') || DATABASE_FOLDER_ID);
   } else {
     // Default to Supplier Roles
     targetFolderId = isDevMode 
@@ -10004,13 +10012,13 @@ function _getPortalRolesSheet(portalType = "SUPPLIER") {
   }
 
   const folder = DriveApp.getFolderById(targetFolderId);
-  const files = folder.getFilesByName("Portal_User_Roles");
+  const files = folder.getFilesByName(targetSheetName);
   let ss;
   
   if (files.hasNext()) {
     ss = SpreadsheetApp.open(files.next());
   } else {
-    ss = SpreadsheetApp.create("Portal_User_Roles");
+    ss = SpreadsheetApp.create(targetSheetName);
     DriveApp.getFileById(ss.getId()).moveTo(folder);
     const sheet = ss.getSheets()[0];
     sheet.setName("UserRoles");
@@ -11202,14 +11210,23 @@ function getSecurePage(page, token, rowParam) {
               }
 
               // Routing for the EWT Client Portal
-              if (page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_")) {
-                  if (page.toUpperCase().includes("A2Z2GO")) companyContext = "A2Z2GO";
-                  else if (page.toUpperCase().includes("KEYSYS")) companyContext = "KEYSYS";
-                  else if (page.toUpperCase().includes("PINGCON")) companyContext = "PINGCON";
-                  else if (page.toUpperCase().includes("BONITA")) companyContext = "BONITA";
-                  page = "EWT_Client_Portal";
-              }
+          if (page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_")) {
+              if (page.toUpperCase().includes("A2Z2GO")) companyContext = "A2Z2GO";
+              else if (page.toUpperCase().includes("KEYSYS")) companyContext = "KEYSYS";
+              else if (page.toUpperCase().includes("PINGCON")) companyContext = "PINGCON";
+              else if (page.toUpperCase().includes("BONITA")) companyContext = "BONITA";
+              page = "EWT_Client_Portal";
           }
+
+          // Routing for General Nightly Narra Portal (Cross-entity)
+          if (page.toUpperCase() === "NIGHTLY_NARRA" || page.toUpperCase() === "PORTAL_NIGHTLY_NARRA") {
+              companyContext = "ALL";
+              page = "NIGHTLY_NARRA";
+          }
+      } else if (page.toUpperCase() === "NIGHTLY_NARRA" || page.toUpperCase() === "PORTAL_NIGHTLY_NARRA") {
+          companyContext = "ALL";
+          page = "NIGHTLY_NARRA";
+      }
           
           let template;
           try {
@@ -12807,8 +12824,10 @@ function resumeCPPBatch() {
              }
          }
          
+         let caMobileCPP = PropertiesService.getScriptProperties().getProperty('COLLECTION_ASSISTANT_MOBILE') || "";
+         let mobileLineCPP = caMobileCPP ? `Mobile: ${caMobileCPP}<br>` : "";
          let collectionAsstHtml = "";
-         [...new Set(collectionAssts)].forEach(asst => collectionAsstHtml += `Expanding Withholding Tax Submission Collection Assistant in-charge: ${asst}<br>`);
+         [...new Set(collectionAssts)].forEach(asst => collectionAsstHtml += `BIR Form 2307 Expanded Withholding Tax (EWT), Collection Assistant in-charge: ${asst}<br>${mobileLineCPP}`);
 
          let mgtEmail = isTech ? (sysSettings["Management_A2Z"] || "") : (sysSettings["Management_Pingcon"] || "");
          if (mgtEmail) ccRecipientsList.push(mgtEmail);
@@ -13398,6 +13417,7 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
     try { verifiedFolder = DriveApp.getFolderById(VERIFIED_FOLDER_ID); } catch(e) { verifiedFolder = null; }
     let processedInvoices = new Map();
     let processedFiles = new Map();
+    let processedJsonMap = new Map();
     let verifiedQueueItems = [];
     
     if (verifiedFolder) {
@@ -13418,7 +13438,25 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
 
                 for(let i=1; i<vData.length; i++) {
                     let source = srcIdx > -1 ? String(vData[i][srcIdx]).trim().toUpperCase() : "";
-                    if (source && !source.includes(companyContext.toUpperCase())) continue;
+                    let vJsonStr = (vdIdx > -1) ? String(vData[i][vdIdx] || "").trim() : "";
+                    
+                    // Check if JSON has an explicit Assigned Entity override
+                    let assignedEnt = "";
+                    if (vJsonStr.startsWith("{")) {
+                      try {
+                        let parsedMeta = JSON.parse(vJsonStr);
+                        assignedEnt = String(parsedMeta["Assigned Entity"] || parsedMeta["Company Entity"] || "").trim().toUpperCase();
+                      } catch(e) {}
+                    }
+                    
+                    let effectivePortal = assignedEnt || source;
+                    let activeCtxUpper = String(companyContext || "").toUpperCase();
+                    
+                    // Strict Entity Gate: If this row belongs to another entity, skip it
+                    if (activeCtxUpper === "PINGCON" && (effectivePortal.includes("BONITA") || effectivePortal.includes("KEYSYS") || effectivePortal.includes("A2Z"))) continue;
+                    if (activeCtxUpper === "BONITA" && !effectivePortal.includes("BONITA")) continue;
+                    if (activeCtxUpper === "KEYSYS" && !effectivePortal.includes("KEYSYS")) continue;
+                    if (activeCtxUpper === "A2Z2GO" && !effectivePortal.includes("A2Z")) continue;
 
                     let rowFileName = String(vData[i][1] || "").trim().toUpperCase();
                     let rdVal = (rdIdx > -1 && vData[i][rdIdx]) ? String(vData[i][rdIdx]).trim() : "";
@@ -13483,8 +13521,15 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
                                 // Index strictly with Supplier Name to prevent cross-vendor collisions
                                 if (normComp) {
                                     processedInvoices.set(invNo + "_" + normComp, rType);
-                                    if (cleanDigits) processedInvoices.set(cleanDigits + "_" + normComp, rType);
-                                    if (rowFileName) processedFiles.set(rowFileName + "_" + normComp, rType);
+                                    processedJsonMap.set(invNo + "_" + normComp, vJson);
+                                    if (cleanDigits) {
+                                        processedInvoices.set(cleanDigits + "_" + normComp, rType);
+                                        processedJsonMap.set(cleanDigits + "_" + normComp, vJson);
+                                    }
+                                    if (rowFileName) {
+                                        processedFiles.set(rowFileName + "_" + normComp, rType);
+                                        processedJsonMap.set(rowFileName + "_" + normComp, vJson);
+                                    }
                                 }
 
                                 let statusLabel = (rType === "Standard Purchase") ? "Processed Purchase" : "Processed 2307";
@@ -13501,7 +13546,9 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
                                     status: statusLabel,
                                     dbSourceName: source,
                                     rowIndex: -1,
-                                    extractedAt: verifiedAt
+                                    extractedAt: verifiedAt,
+                                    extractedData: vJson,
+                                    verifiedData: vJson
                                 });
                             }
                         }
@@ -13643,6 +13690,14 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
                         let singleDocParsed = JSON.parse(extractedData);
                         singleDocParsed.documents = [doc];
                         
+                        let bundledExtractedJson = JSON.stringify(singleDocParsed);
+                        let matchedVerifiedJson = null;
+                        if (cleanInv && cleanComp && processedJsonMap.has(cleanInv + "_" + cleanComp)) {
+                            matchedVerifiedJson = processedJsonMap.get(cleanInv + "_" + cleanComp);
+                        } else if (cleanFile && cleanComp && processedJsonMap.has(cleanFile + "_" + cleanComp)) {
+                            matchedVerifiedJson = processedJsonMap.get(cleanFile + "_" + cleanComp);
+                        }
+
                         results.push({
                             sn: results.length + 1,
                             fileName: fileName,
@@ -13655,7 +13710,9 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
                             status: status,
                             dbSourceName: ss.getName(),
                             rowIndex: i,
-                            extractedAt: extractedAt
+                            extractedAt: extractedAt,
+                            extractedData: bundledExtractedJson,
+                            verifiedData: matchedVerifiedJson
                         });
                         
                         if (status === "Pending") pendingCount++;
@@ -13668,13 +13725,34 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
         }
     }
 
-    // 3. Ensure ALL verified records for this company are merged so they never disappear on refresh
+    // 3. Ensure verified records update existing matches and only genuinely unique records are added
+    const normStr = s => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
     verifiedQueueItems.forEach(vItem => {
-        let alreadyInResults = results.some(r => 
-            String(r.invoiceNo).trim().toUpperCase() === vItem.invoiceNo &&
-            r.status === vItem.status
-        );
-        if (!alreadyInResults) {
+        let vInv = normStr(vItem.invoiceNo);
+        let vComp = normStr(vItem.companyName);
+        let vFile = String(vItem.fileName || "").trim().toUpperCase();
+        let vFileId = String(vItem.fileId || "").trim();
+
+        // Check if an AI extracted record already exists for this exact file/supplier
+        let matchedIndex = results.findIndex(r => {
+            if (vFileId && r.fileId && String(r.fileId).trim() === vFileId) return true;
+            if (vFile && r.fileName && String(r.fileName).trim().toUpperCase() === vFile) return true;
+            let rInv = normStr(r.invoiceNo);
+            let rComp = normStr(r.companyName);
+            return (rInv === vInv && (rComp.includes(vComp) || vComp.includes(rComp)));
+        });
+
+        if (matchedIndex > -1) {
+            // Update the existing record with the latest verified data (prevents duplicates)
+            results[matchedIndex].status = vItem.status;
+            results[matchedIndex].invoiceNo = vItem.invoiceNo;
+            results[matchedIndex].companyName = vItem.companyName || results[matchedIndex].companyName;
+            results[matchedIndex].totalAmount = vItem.totalAmount || results[matchedIndex].totalAmount;
+            results[matchedIndex].verifiedData = vItem.verifiedData;
+            results[matchedIndex].extractedData = vItem.verifiedData || results[matchedIndex].extractedData;
+        } else {
+            // Genuinely unique verified record not in the AI table
             if (lowerQuery !== "") {
                 let matchQ = vItem.invoiceNo.toLowerCase().includes(lowerQuery) ||
                              vItem.companyName.toLowerCase().includes(lowerQuery) ||
@@ -13685,27 +13763,45 @@ function webappGetProcessingQueue(companyContext, offset = 0, searchQuery = "", 
         }
     });
 
+    // Final deduplication sweep: ensure no two items have the same filename or same invoice+supplier
+    let uniqueResults = [];
+    let seenSignatures = new Set();
+
+    results.forEach(item => {
+        let sigKey = item.fileName ? item.fileName.trim().toUpperCase() : (normStr(item.invoiceNo) + "_" + normStr(item.companyName));
+        if (!seenSignatures.has(sigKey)) {
+            seenSignatures.add(sigKey);
+            uniqueResults.push(item);
+        } else {
+            // If duplicate found, prioritize the one marked Processed over Pending
+            let existingIdx = uniqueResults.findIndex(x => {
+                let xSig = x.fileName ? x.fileName.trim().toUpperCase() : (normStr(x.invoiceNo) + "_" + normStr(x.companyName));
+                return xSig === sigKey;
+            });
+            if (existingIdx > -1 && item.status !== 'Pending' && uniqueResults[existingIdx].status === 'Pending') {
+                uniqueResults[existingIdx] = item;
+            }
+        }
+    });
+
     // Re-sequence sequential SNs for clean display
-    results.forEach((item, idx) => {
+    uniqueResults.forEach((item, idx) => {
         item.sn = idx + 1;
     });
     
-    return { success: true, results: results };
+    return { success: true, results: uniqueResults };
   } catch (e) {
     return { error: "Queue DB Error: " + e.message };
   }
 }
 
 function webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessionToken = null) {
-  let lock = LockService.getScriptLock();
+  let lock = null;
   try {
-    lock.waitLock(10000); // Wait safely just for the database save
-    
     let parsedJson = JSON.parse(updatedJsonStr);
     let isStandardPurchase = parsedJson["Record Type"] === "Standard Purchase";
     
     let releaseDateStr = parsedJson["2307 Release Date"];
-    // Always use current date for standard purchases to avoid creating old yearly databases from typos/old invoices
     let rDate = new Date();
     if (!isStandardPurchase) {
         let tempDate = new Date(releaseDateStr);
@@ -13770,21 +13866,27 @@ function webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessi
       sheet.getRange(1, 1, 1, 6).setValues([["SN", "File Name", "Verified Data", "2307 Release Date", "Source", "Date and Time Verified (MM/DD/YYYY)"]]);
       sheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#f3f3f3");
     }
-    
-    let data = sheet.getDataRange().getValues();
-    let rowIndex = -1;
-    let maxSn = 0;
-    
+
     let currentInvNumber = String(parsedJson["Invoice Number"] || "").trim();
     let currentCompName = String(parsedJson["Company Name"] || "").trim().toUpperCase();
-    let currentSource = String(dbSourceName).trim().toUpperCase();
+    
+    // Resolve Target Entity (Preserve default from dbSourceName if not manually changed)
+    let assignedEntity = String(parsedJson["Assigned Entity"] || parsedJson["Company Entity"] || "").trim().toUpperCase();
+    let currentSource = String(dbSourceName || "").trim().toUpperCase();
+    
+    if (assignedEntity) {
+      if (assignedEntity.includes("BONITA")) currentSource = "BONITA - RECEIVING";
+      else if (assignedEntity.includes("KEYSYS")) currentSource = "KEYSYS - RECEIVING";
+      else if (assignedEntity.includes("A2Z")) currentSource = "A2Z2GO - RECEIVING";
+      else if (assignedEntity.includes("PINGCON")) currentSource = "PINGCON - RECEIVING";
+    }
+    
     let originAnchor = parsedJson["originAnchor"] || null;
 
-    // Resolve original identity to lock onto the existing row even if the user changed the invoice number or supplier name
     let targetOldInv = originAnchor && originAnchor.originalInvoiceNo ? String(originAnchor.originalInvoiceNo).trim().toUpperCase() : currentInvNumber.toUpperCase();
     let targetOldComp = originAnchor && originAnchor.originalCompanyName ? String(originAnchor.originalCompanyName).trim().toUpperCase() : currentCompName;
 
-    // Cross-Year Sheet Migration: If the user changed the release date year, purge the row from the old year's spreadsheet
+    // Cross-Year Sheet Migration done outside the sheet write lock
     if (originAnchor && originAnchor.originalReleaseDate && !isStandardPurchase) {
         let oldDate = new Date(originAnchor.originalReleaseDate);
         let oldYear = !isNaN(oldDate.getTime()) ? Utilities.formatDate(oldDate, Session.getScriptTimeZone(), "yyyy") : targetYear;
@@ -13819,73 +13921,110 @@ function webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessi
         }
     }
 
-    for (let i = 1; i < data.length; i++) {
-      let currentSn = parseInt(data[i][0]) || 0;
-      if (currentSn > maxSn) maxSn = currentSn;
-      
-      let rowFileName = String(data[i][1]).trim();
-      let rowSource = String(data[i][4]).trim().toUpperCase();
-      let rowJsonStr = String(data[i][2]).trim();
-      let rowInvNumber = "";
-      let rowCompName = "";
+    // MICRO-LOCK: 30-second wait limit that ONLY protects the 0.2s sheet row write
+    lock = LockService.getScriptLock();
+    let isEdit = false;
+    let finalJsonStr = "";
+    
+    try {
+      lock.waitLock(30000); // 30 seconds wait timeout
 
-      if (rowJsonStr.startsWith("{")) {
+      let data = sheet.getDataRange().getValues();
+      let rowIndex = -1;
+      let maxSn = 0;
+
+      for (let i = 1; i < data.length; i++) {
+        let currentSn = parseInt(data[i][0]) || 0;
+        if (currentSn > maxSn) maxSn = currentSn;
+        
+        let rowFileName = String(data[i][1]).trim();
+        let rowSource = String(data[i][4]).trim().toUpperCase();
+        let rowJsonStr = String(data[i][2]).trim();
+        let rowInvNumber = "";
+        let rowCompName = "";
+
+        if (rowJsonStr.startsWith("{")) {
+            try {
+                let rowParsed = JSON.parse(rowJsonStr);
+                rowInvNumber = String(rowParsed["Invoice Number"] || "").trim();
+                rowCompName = String(rowParsed["Company Name"] || "").trim().toUpperCase();
+            } catch(e) {
+                let invM = rowJsonStr.match(/"Invoice Number"\s*:\s*"([^"]+)"/i);
+                let compM = rowJsonStr.match(/"Company Name"\s*:\s*"([^"]+)"/i);
+                if (invM) rowInvNumber = String(invM[1]).trim();
+                if (compM) rowCompName = String(compM[1]).trim().toUpperCase();
+            }
+        }
+        
+        let oldEntityUpper = (originAnchor && originAnchor.originalEntity) ? String(originAnchor.originalEntity).trim().toUpperCase() : "";
+        let sameSource = (rowSource === currentSource || (rowSource && currentSource && (rowSource.includes(currentSource) || currentSource.includes(rowSource))));
+        
+        // If entity was migrated (e.g. from PINGCON to BONITA), match row using old entity
+        if (!sameSource && oldEntityUpper) {
+          sameSource = (rowSource.includes(oldEntityUpper) || oldEntityUpper.includes(rowSource.replace(/[^A-Z]/g, '')));
+        }
+        
+        let isMatch = false;
+
+        let normStr = s => String(s || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        let targetFileId = String(parsedJson.fileId || "").trim();
+
+        // Match existing row across conversions:
+        // Priority 1: Match by Google Drive File ID if present in row JSON
+        // Priority 2: Match by targetOldInv or currentInvNumber with Company Name
+        // Priority 3: Match by Filename
+        let rowFileId = "";
+        if (rowJsonStr.startsWith("{")) {
           try {
-              let rowParsed = JSON.parse(rowJsonStr);
-              rowInvNumber = String(rowParsed["Invoice Number"] || "").trim();
-              rowCompName = String(rowParsed["Company Name"] || "").trim().toUpperCase();
-          } catch(e) {
-              let invM = rowJsonStr.match(/"Invoice Number"\s*:\s*"([^"]+)"/i);
-              let compM = rowJsonStr.match(/"Company Name"\s*:\s*"([^"]+)"/i);
-              if (invM) rowInvNumber = String(invM[1]).trim();
-              if (compM) rowCompName = String(compM[1]).trim().toUpperCase();
-          }
-      }
-      
-      let sameSource = (rowSource === currentSource || (rowSource && currentSource && (rowSource.includes(currentSource) || currentSource.includes(rowSource))));
-      let isMatch = false;
+            let rP = JSON.parse(rowJsonStr);
+            rowFileId = String(rP.fileId || "").trim();
+          } catch(e) {}
+        }
 
-      // Smart In-Place Matching: Matches the original identity anchor first so editing invoice # or supplier overwrites the same row
-      if (targetOldInv !== "") {
-        let matchOld = (rowInvNumber !== "" && rowInvNumber.toUpperCase() === targetOldInv && (targetOldComp === "" || rowCompName === "" || rowCompName === targetOldComp));
-        let matchNew = (rowInvNumber !== "" && rowInvNumber.toUpperCase() === currentInvNumber.toUpperCase() && (currentCompName === "" || rowCompName === "" || rowCompName === currentCompName));
-        isMatch = (matchOld || matchNew) && sameSource;
+        if (targetFileId !== "" && rowFileId !== "" && targetFileId === rowFileId && sameSource) {
+          isMatch = true;
+        } else if (targetOldInv !== "") {
+          let matchOld = (normStr(rowInvNumber) === normStr(targetOldInv) && (targetOldComp === "" || normStr(rowCompName).includes(normStr(targetOldComp)) || normStr(targetOldComp).includes(normStr(rowCompName))));
+          let matchNew = (normStr(rowInvNumber) === normStr(currentInvNumber) && (currentCompName === "" || normStr(rowCompName).includes(normStr(currentCompName)) || normStr(currentCompName).includes(normStr(rowCompName))));
+          isMatch = (matchOld || matchNew) && sameSource;
+        } else {
+          isMatch = (rowFileName !== "" && rowFileName === fileName && sameSource);
+        }
+
+        if (isMatch) {
+          rowIndex = i + 1;
+          break;
+        }
+      }
+
+      let finalSn = (rowIndex > -1) ? (parseInt(data[rowIndex-1][0]) || (maxSn + 1)) : (maxSn + 1);
+      parsedJson["SN"] = finalSn;
+      finalJsonStr = JSON.stringify(parsedJson);
+
+      let cleanReleaseDate = isStandardPurchase ? "" : Utilities.formatDate(rDate, Session.getScriptTimeZone(), "MM/dd/yyyy");
+      let verifiedDateTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm");
+
+      if (rowIndex > -1) {
+        sheet.getRange(rowIndex, 2, 1, 5).setValues([[fileName, finalJsonStr, cleanReleaseDate, currentSource, verifiedDateTime]]);
+        sheet.getRange(rowIndex, 3).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment("top");
+        isEdit = true;
       } else {
-        isMatch = (rowFileName !== "" && rowFileName === fileName && sameSource);
+        sheet.appendRow([finalSn, fileName, finalJsonStr, cleanReleaseDate, currentSource, verifiedDateTime]);
+        sheet.getRange(sheet.getLastRow(), 3).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment("top");
       }
+      SpreadsheetApp.flush();
+    } finally {
+      // RELEASE LOCK IMMEDIATELY: Next invoice can write to the sheet right away!
+      try { lock.releaseLock(); } catch(e){}
+    }
 
-      if (isMatch) {
-        rowIndex = i + 1;
-        break;
-      }
-    }
-    
-    let finalSn = (rowIndex > -1) ? (parseInt(data[rowIndex-1][0]) || (maxSn + 1)) : (maxSn + 1);
-    parsedJson["SN"] = finalSn;
-    let finalJsonStr = JSON.stringify(parsedJson);
-    
-    // Strict separation: leave 2307 Release Date blank in the database for Standard Purchases
-    let cleanReleaseDate = isStandardPurchase ? "" : Utilities.formatDate(rDate, Session.getScriptTimeZone(), "MM/dd/yyyy");
-    let verifiedDateTime = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm");
-    
-    if (rowIndex > -1) {
-      sheet.getRange(rowIndex, 2, 1, 5).setValues([[fileName, finalJsonStr, cleanReleaseDate, dbSourceName, verifiedDateTime]]);
-      sheet.getRange(rowIndex, 3).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment("top");
-    } else {
-      sheet.appendRow([finalSn, fileName, finalJsonStr, cleanReleaseDate, dbSourceName, verifiedDateTime]);
-      sheet.getRange(sheet.getLastRow(), 3).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment("top");
-    }
-    
-    let isEdit = (rowIndex > -1);
+    // NON-BLOCKING BACKGROUND TASKS (Executed safely outside the lock)
     let recordLabel = isStandardPurchase ? "Purchase Record" : "2307 Invoice";
     let actionStr = isEdit ? "Edited " + recordLabel : "Created " + recordLabel;
-    
-    // Stamped with verified employee identity
     logSystemActivity(currentSource, actionStr, `Invoice No: ${currentInvNumber} | Supplier: ${parsedJson["Company Name"] || "N/A"}`, sessionToken);
 
-    // --- CLOUD VAULT DUAL-WRITE PERSISTENCE ---
+    // Cloud Vault Dual-Write Sync (Non-blocking outside the lock)
     try {
-      // Force uppercase & trimmed composite key to prevent casing mismatches
       let vaultKey = `${currentInvNumber}_${currentCompName}`.trim().toUpperCase();
       let totalAmtStr = "";
       if (parsedJson.isMixedVat) {
@@ -13905,8 +14044,11 @@ function webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessi
         source_database: currentSource || ""
       };
 
-      // Prune old key from Cloud Vault if the invoice number or supplier name changed
-      if (originAnchor && (originAnchor.originalInvoiceNo !== currentInvNumber || originAnchor.originalCompanyName !== currentCompName)) {
+      if (originAnchor && (
+          originAnchor.originalInvoiceNo !== currentInvNumber || 
+          originAnchor.originalCompanyName !== currentCompName ||
+          (originAnchor.originalEntity && originAnchor.originalEntity.toUpperCase() !== currentSource.toUpperCase())
+      )) {
         let oldTargetInv = originAnchor.originalInvoiceNo || "";
         let oldTargetComp = originAnchor.originalCompanyName || "";
         let oldVaultKey = `${oldTargetInv}_${oldTargetComp}`.trim().toUpperCase();
@@ -13919,20 +14061,30 @@ function webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessi
     } catch(vaultErr) {
       console.warn("[Cloud Vault] Non-blocking sync warning: " + vaultErr.message);
     }
-    // ------------------------------------------
 
-    SpreadsheetApp.flush();
     return { success: true };
     
   } catch (e) {
     return { error: e.message };
   } finally {
-    lock.releaseLock();
+    if (lock) {
+      try { lock.releaseLock(); } catch(err){}
+      lock = null;
+    }
   }
 }
 
 function webappSave2307AndVerifiedData(fileName, updatedJsonStr, pdfHtmlStr, pdfName, dbSourceName, sessionToken = null) {
   try {
+    const parsedData = JSON.parse(updatedJsonStr);
+    let assignedEntity = String(parsedData["Assigned Entity"] || parsedData["Company Entity"] || "").trim().toUpperCase();
+    if (assignedEntity) {
+      if (assignedEntity.includes("BONITA")) dbSourceName = "BONITA - RECEIVING";
+      else if (assignedEntity.includes("KEYSYS")) dbSourceName = "KEYSYS - RECEIVING";
+      else if (assignedEntity.includes("A2Z")) dbSourceName = "A2Z2GO - RECEIVING";
+      else if (assignedEntity.includes("PINGCON")) dbSourceName = "PINGCON - RECEIVING";
+    }
+
     let saveResult = webappSaveVerifiedInvoice(fileName, updatedJsonStr, dbSourceName, sessionToken);
     if (saveResult.error) return saveResult;
     
@@ -13963,19 +14115,24 @@ function webappSave2307AndVerifiedData(fileName, updatedJsonStr, pdfHtmlStr, pdf
 
     let rootFolder = DriveApp.getFolderById(GENERATED_2307_FOLDER_ID);
     
-    let parsedData = JSON.parse(updatedJsonStr);
     let releaseDateStr = parsedData["2307 Release Date"];
     let releaseDate = new Date(releaseDateStr);
     if (isNaN(releaseDate.getTime())) releaseDate = new Date(); 
     
     let monthYear = Utilities.formatDate(releaseDate, Session.getScriptTimeZone(), "MMMM yyyy");
     
+    let originAnchor = parsedData["originAnchor"] || null;
+    if (!assignedEntity) {
+      assignedEntity = String(parsedData["Assigned Entity"] || parsedData["Company Entity"] || "").trim().toUpperCase();
+    }
+    
+    // Determine new destination Payor folder
     let payorFolder = "Pingcon";
-    let sourceUpper = String(dbSourceName).toUpperCase();
-    if (sourceUpper.includes("KEYSYS")) payorFolder = "Keysys";
-    else if (sourceUpper.includes("A2Z") || sourceUpper.includes("A2Z2GO")) payorFolder = "A2Z2GO";
-    else if (sourceUpper.includes("BONITA")) payorFolder = "Bonita";
-    else if (sourceUpper.includes("PINGCON")) payorFolder = "Pingcon";
+    let targetSource = assignedEntity || String(dbSourceName).toUpperCase();
+    if (targetSource.includes("KEYSYS")) payorFolder = "Keysys";
+    else if (targetSource.includes("A2Z") || targetSource.includes("A2Z2GO")) payorFolder = "A2Z2GO";
+    else if (targetSource.includes("BONITA")) payorFolder = "Bonita";
+    else if (targetSource.includes("PINGCON")) payorFolder = "Pingcon";
 
     let compFolders = rootFolder.getFoldersByName(payorFolder);
     let compFolder = compFolders.hasNext() ? compFolders.next() : rootFolder.createFolder(payorFolder);
@@ -13983,31 +14140,55 @@ function webappSave2307AndVerifiedData(fileName, updatedJsonStr, pdfHtmlStr, pdf
     let monthFolders = compFolder.getFoldersByName(monthYear);
     let targetFolder = monthFolders.hasNext() ? monthFolders.next() : compFolder.createFolder(monthYear);
     
-    // Compute the old PDF name if the user edited the supplier or invoice number
-            let originAnchor = parsedData["originAnchor"] || null;
-            let oldPdfNameToDelete = "";
-            if (originAnchor && (originAnchor.originalInvoiceNo || originAnchor.originalCompanyName)) {
-                let oldCleanSup = String(originAnchor.originalCompanyName || "Supplier").replace(/[^a-zA-Z0-9 -]/g, "").trim();
-                let oldInv = originAnchor.originalInvoiceNo || "INV";
-                oldPdfNameToDelete = `2307_${oldCleanSup}_${oldInv}.pdf`;
-            }
+    // Determine previous Payor folder (if entity changed)
+    let oldPayorFolder = payorFolder;
+    if (originAnchor && originAnchor.originalEntity) {
+      let oldEnt = String(originAnchor.originalEntity).toUpperCase();
+      if (oldEnt.includes("KEYSYS")) oldPayorFolder = "Keysys";
+      else if (oldEnt.includes("A2Z")) oldPayorFolder = "A2Z2GO";
+      else if (oldEnt.includes("BONITA")) oldPayorFolder = "Bonita";
+      else if (oldEnt.includes("PINGCON")) oldPayorFolder = "Pingcon";
+    }
 
-            let allMonthFolders = compFolder.getFolders();
-            while (allMonthFolders.hasNext()) {
-                let mFolder = allMonthFolders.next();
-                // Trash files matching the current new name
-                let oldFiles = mFolder.getFilesByName(pdfName);
-                while (oldFiles.hasNext()) {
-                    try { oldFiles.next().setTrashed(true); } catch(e) {}
-                }
-                // Trash the previous PDF so no duplicate/orphan PDF remains in Google Drive
-                if (oldPdfNameToDelete && oldPdfNameToDelete !== pdfName) {
-                    let oldNameFiles = mFolder.getFilesByName(oldPdfNameToDelete);
-                    while (oldNameFiles.hasNext()) {
-                        try { oldNameFiles.next().setTrashed(true); } catch(e) {}
-                    }
-                }
+    let oldPdfNameToDelete = "";
+    if (originAnchor && (originAnchor.originalInvoiceNo || originAnchor.originalCompanyName)) {
+        let oldCleanSup = String(originAnchor.originalCompanyName || "Supplier").replace(/[^a-zA-Z0-9 -]/g, "").trim();
+        let oldInv = originAnchor.originalInvoiceNo || "INV";
+        oldPdfNameToDelete = `2307_${oldCleanSup}_${oldInv}.pdf`;
+    }
+
+    // 1. Purge old PDF from PREVIOUS entity folder if entity was moved
+    if (oldPayorFolder !== payorFolder) {
+      let prevCompFolders = rootFolder.getFoldersByName(oldPayorFolder);
+      if (prevCompFolders.hasNext()) {
+        let prevComp = prevCompFolders.next();
+        let prevMonths = prevComp.getFolders();
+        while (prevMonths.hasNext()) {
+          let pm = prevMonths.next();
+          let targetDeleteName = oldPdfNameToDelete || pdfName;
+          let oldEntityFiles = pm.getFilesByName(targetDeleteName);
+          while (oldEntityFiles.hasNext()) {
+            try { oldEntityFiles.next().setTrashed(true); } catch(e) {}
+          }
+        }
+      }
+    }
+
+    // 2. Purge stale PDF within the target folder
+    let allMonthFolders = compFolder.getFolders();
+    while (allMonthFolders.hasNext()) {
+        let mFolder = allMonthFolders.next();
+        let oldFiles = mFolder.getFilesByName(pdfName);
+        while (oldFiles.hasNext()) {
+            try { oldFiles.next().setTrashed(true); } catch(e) {}
+        }
+        if (oldPdfNameToDelete && oldPdfNameToDelete !== pdfName) {
+            let oldNameFiles = mFolder.getFilesByName(oldPdfNameToDelete);
+            while (oldNameFiles.hasNext()) {
+                try { oldNameFiles.next().setTrashed(true); } catch(e) {}
             }
+        }
+    }
     
     let pdfFile = targetFolder.createFile(blob);
     return { success: true, pdfUrl: pdfFile.getUrl(), folderUrl: compFolder.getUrl(), pdfId: pdfFile.getId() };
@@ -14535,10 +14716,22 @@ function resumeEwtSupplierBatch() {
                   
                   // Extract entity directly from the RECEIVING database source names
                   let payorVal = "Pingcon"; 
-                  if (sourceStr.includes("KEYSYS")) payorVal = "Keysys";
+                  if (sourceStr.includes("BONITA")) payorVal = "Bonita";
+                  else if (sourceStr.includes("KEYSYS")) payorVal = "Keysys";
                   else if (sourceStr.includes("A2Z2GO") || sourceStr.includes("A2Z")) payorVal = "A2Z2GO";
-                  else if (sourceStr.includes("BONITA")) payorVal = "Bonita";
                   else if (sourceStr.includes("PINGCON")) payorVal = "Pingcon";
+
+                  // Check if the user manually reassigned the entity inside the verified JSON
+                  if (jsonStr.startsWith("{")) {
+                    try {
+                      let pMeta = JSON.parse(jsonStr);
+                      let aEnt = String(pMeta["Assigned Entity"] || pMeta["Company Entity"] || "").toUpperCase();
+                      if (aEnt.includes("BONITA")) payorVal = "Bonita";
+                      else if (aEnt.includes("KEYSYS")) payorVal = "Keysys";
+                      else if (aEnt.includes("A2Z")) payorVal = "A2Z2GO";
+                      else if (aEnt.includes("PINGCON")) payorVal = "Pingcon";
+                    } catch(e) {}
+                  }
 
                   if (jsonStr.startsWith("{") && releaseDateStr) {
                       try {
@@ -15078,11 +15271,8 @@ function _processPdfBlobWithGemini(blob, fileName, totalPages = 1) {
 
 
 function webappSaveClient2307(payload, companyContext, sessionToken = null) {
-  let lock = LockService.getScriptLock();
   try {
-    lock.waitLock(10000);
-
-    // --- SAVE SINGLE PAGE TO GOOGLE DRIVE BASED ON 2307 RECEIVE DATE ---
+    // --- SAVE SINGLE PAGE TO GOOGLE DRIVE (Executed OUTSIDE the lock) ---
     let savedDriveFileId = "";
     if (payload.pageImageBase64 && payload.pageImageBase64.length > 100) {
       try {
@@ -15188,7 +15378,6 @@ function webappSaveClient2307(payload, companyContext, sessionToken = null) {
     let finalSn = (rowIndex > -1) ? (parseInt(data[rowIndex-1][0], 10) || (maxSn + 1)) : (maxSn + 1);
     let timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm");
     
-    // Store single-page Google Drive File ID (Format: DRIVE_ID|PAGE_NUM|RECORD_KEY)
     let effectiveDriveId = savedDriveFileId || payload.driveFileId || payload.fileId || "";
     let storedFileIdRef = effectiveDriveId ? `${effectiveDriveId}|${payload.pageNum || 1}|${uniqueRecordKey}` : uniqueRecordKey;
 
@@ -15198,22 +15387,26 @@ function webappSaveClient2307(payload, companyContext, sessionToken = null) {
       payload.receiveDate || "", storedFileIdRef, payload.fileName, timestamp
     ];
     
-    if (rowIndex > -1) {
-      sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowData]);
-    } else {
-      sheet.appendRow(rowData);
+    // MICRO-LOCK: Only holds for the 0.2s sheet row write
+    let lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(30000);
+      if (rowIndex > -1) {
+        sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowData]);
+      } else {
+        sheet.appendRow(rowData);
+      }
+      SpreadsheetApp.flush();
+    } finally {
+      try { lock.releaseLock(); } catch(e){}
     }
     
     let pageLabel = payload.pageNum ? `Page ${payload.pageNum} | ` : "";
-    // Stamped with verified employee identity
     logClientActivity(companyContext, "Saved Client 2307", `${pageLabel}Customer: ${payload.customerName} | SI: ${payload.siNo} | Gross: ${payload.incomePayment}`, sessionToken);
     
-    SpreadsheetApp.flush();
     return { success: true };
   } catch (e) {
     return { error: e.message };
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -15734,10 +15927,19 @@ function webappScanEwtData(startStr, endStr, verifiedStartStr, verifiedEndStr, v
             let sourceStr = String(data[i][sourceColIdx]).toUpperCase();
             
             let isCompanyMatch = false;
-            if (targetPayor === "BONITA") isCompanyMatch = sourceStr.includes("BONITA");
-            else if (targetPayor === "PINGCON") isCompanyMatch = (sourceStr.includes("PINGCON") && !sourceStr.includes("BONITA"));
-            else if (targetPayor === "KEYSYS") isCompanyMatch = sourceStr.includes("KEYSYS");
-            else if (targetPayor === "A2Z2GO") isCompanyMatch = (sourceStr.includes("A2Z") || sourceStr.includes("A2Z2GO"));
+            let effectiveSource = sourceStr;
+            if (jsonStr.startsWith("{")) {
+              try {
+                let pMeta = JSON.parse(jsonStr);
+                let aEnt = String(pMeta["Assigned Entity"] || pMeta["Company Entity"] || "").toUpperCase();
+                if (aEnt) effectiveSource = aEnt;
+              } catch(e) {}
+            }
+
+            if (targetPayor === "BONITA") isCompanyMatch = effectiveSource.includes("BONITA");
+            else if (targetPayor === "PINGCON") isCompanyMatch = (effectiveSource.includes("PINGCON") && !effectiveSource.includes("BONITA"));
+            else if (targetPayor === "KEYSYS") isCompanyMatch = effectiveSource.includes("KEYSYS");
+            else if (targetPayor === "A2Z2GO") isCompanyMatch = (effectiveSource.includes("A2Z") || effectiveSource.includes("A2Z2GO"));
 
             if (isCompanyMatch && jsonStr.startsWith("{") && releaseDateStr) {
               let rDate = new Date(releaseDateStr);
@@ -16361,6 +16563,8 @@ function logClientActivity(companyContext, action, details, sessionToken = null)
   }
 }
 
+
+
 // SAFE DIAGNOSTIC TEST: Tests Real User Stamping into Activity Logs
 function TEST_auditLoggingWithUser() {
   const employees = fetchActiveHREmployees();
@@ -16660,14 +16864,8 @@ function resumeNightlyNarraBatch() {
   
   let task = pending.shift();
 
-  // 1. Gather Date & Entity Configurations (Automated to process EVERYTHING)
-  // Auto-rolling 12 months: Starts 3 months before the current month, ends 12 months later.
-  const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1, 0, 0, 0); 
-  const endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), 0, 23, 59, 59);
-  
-  let allowedEntities = ["PINGCON", "KEYSYS"]; // Automatically allow all main entities
-  let allowedBanks = []; // Empty array triggers the logic to allow ALL banks
+  let allowedEntities = JSON.parse(props.getProperty("SALES_ENTITIES") || '["PINGCON", "KEYSYS"]').map(e => String(e).toUpperCase());
+  let allowedBanks = JSON.parse(props.getProperty("NIGHTLY_NARRA_BANKS") || '[]');
   
   const narraAllData = gatherAllData("New_Narra_Data_");
   if (narraAllData.length === 0) {
@@ -16684,6 +16882,39 @@ function resumeNightlyNarraBatch() {
   let dateColIdx = lowerHeaders.indexOf("voucherdate");
   let bankNameIdx = lowerHeaders.indexOf("bankname");
   let sourceFileIdx = lowerHeaders.indexOf("sourcefile");
+
+  // Dynamic Filename & Database Oldest Date Extraction
+  let detectedStart = null;
+  let oldestVoucherDate = null;
+
+  for (let i = 0; i < narraAllData.length; i++) {
+    let row = narraAllData[i].data;
+    
+    // Check filename date pattern
+    if (!detectedStart && sourceFileIdx > -1) {
+      let sFile = String(row[sourceFileIdx] || "");
+      let m = sFile.match(/([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})\s+to\s+([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
+      if (m) {
+        let parsedD = new Date(m[1].replace(/,/g, ''));
+        if (!isNaN(parsedD.getTime())) detectedStart = parsedD;
+      }
+    }
+
+    // Detect oldest voucher date across database rows
+    if (dateColIdx > -1 && row[dateColIdx]) {
+      let vDate = new Date(row[dateColIdx]);
+      if (!isNaN(vDate.getTime()) && vDate.getFullYear() > 2000) {
+        if (!oldestVoucherDate || vDate < oldestVoucherDate) {
+          oldestVoucherDate = vDate;
+        }
+      }
+    }
+  }
+
+  // Priority: 1. Filename Start Date, 2. Oldest Database Voucher Date, 3. Current Date
+  let baseDate = detectedStart || oldestVoucherDate || new Date();
+  let startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1, 0, 0, 0); // Always 1st day of month
+  let endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), 0, 23, 59, 59); // Exactly 1 year
   let importDateIdx = lowerHeaders.indexOf("importdate");
   let checkNumIdx = lowerHeaders.indexOf("checknumber"); 
   let checkDateIdx = lowerHeaders.indexOf("checkdate"); // <--- Added Check Date Index
@@ -17084,12 +17315,13 @@ function resumeNightlyNarraBatch() {
       if (ccEmails) emailOptions.cc = ccEmails;
 
       sendRobustEmail(toEmails, subject, htmlBody, emailOptions);
+      logNarraActivity("Generated & Dispatched Reports", `Dispatched ${attachments.length} bank report(s) covering ${sRangeStr} to ${eRangeStr}`);
   }
 
   // Final Cleanup
   props.setProperty("PENDING_NIGHTLY_NARRA", JSON.stringify(pending));
   deleteTriggersByName("resumeNightlyNarraBatch");
-  clearReportLock();
+  clearReportLock("NARRA");
   console.log("Nightly Narra processed successfully.");
 }
 
@@ -17248,10 +17480,19 @@ function webappPreviewPurchaseReport(startStr, endStr, companyContext) {
             let sourceStr = String(data[i][sourceColIdx]).toUpperCase();
             
             let isCompanyMatch = false;
-            if (targetPayor === "BONITA") isCompanyMatch = sourceStr.includes("BONITA");
-            else if (targetPayor === "PINGCON") isCompanyMatch = (sourceStr.includes("PINGCON") && !sourceStr.includes("BONITA"));
-            else if (targetPayor === "KEYSYS") isCompanyMatch = sourceStr.includes("KEYSYS");
-            else if (targetPayor === "A2Z2GO") isCompanyMatch = (sourceStr.includes("A2Z") || sourceStr.includes("A2Z2GO"));
+            let effectiveSource = sourceStr;
+            if (jsonStr.startsWith("{")) {
+              try {
+                let pMeta = JSON.parse(jsonStr);
+                let aEnt = String(pMeta["Assigned Entity"] || pMeta["Company Entity"] || "").toUpperCase();
+                if (aEnt) effectiveSource = aEnt;
+              } catch(e) {}
+            }
+
+            if (targetPayor === "BONITA") isCompanyMatch = effectiveSource.includes("BONITA");
+            else if (targetPayor === "PINGCON") isCompanyMatch = (effectiveSource.includes("PINGCON") && !effectiveSource.includes("BONITA"));
+            else if (targetPayor === "KEYSYS") isCompanyMatch = effectiveSource.includes("KEYSYS");
+            else if (targetPayor === "A2Z2GO") isCompanyMatch = (effectiveSource.includes("A2Z") || effectiveSource.includes("A2Z2GO"));
 
             if (isCompanyMatch && jsonStr.startsWith("{")) {
                 try {
@@ -17600,10 +17841,22 @@ function _41_scheduledEwtSupplierReport() {
                   let sourceStr = String(data[i][sourceColIdx]).toUpperCase();
                   
                   let payorVal = "Pingcon"; 
-                  if (sourceStr.includes("KEYSYS")) payorVal = "Keysys";
+                  if (sourceStr.includes("BONITA")) payorVal = "Bonita";
+                  else if (sourceStr.includes("KEYSYS")) payorVal = "Keysys";
                   else if (sourceStr.includes("A2Z2GO") || sourceStr.includes("A2Z")) payorVal = "A2Z2GO";
-                  else if (sourceStr.includes("BONITA")) payorVal = "Bonita";
                   else if (sourceStr.includes("PINGCON")) payorVal = "Pingcon";
+
+                  // Check if the user manually reassigned the entity inside the verified JSON
+                  if (jsonStr.startsWith("{")) {
+                    try {
+                      let pMeta = JSON.parse(jsonStr);
+                      let aEnt = String(pMeta["Assigned Entity"] || pMeta["Company Entity"] || "").toUpperCase();
+                      if (aEnt.includes("BONITA")) payorVal = "Bonita";
+                      else if (aEnt.includes("KEYSYS")) payorVal = "Keysys";
+                      else if (aEnt.includes("A2Z")) payorVal = "A2Z2GO";
+                      else if (aEnt.includes("PINGCON")) payorVal = "Pingcon";
+                    } catch(e) {}
+                  }
 
                   if (jsonStr.startsWith("{") && releaseDateStr) {
                       try {
@@ -18207,3 +18460,312 @@ function webappReleaseInvoiceLock(invoiceNo, userIdentifier, companyContext) {
   }
 }
 
+// =========================================================================
+// DEDICATED NIGHTLY NARRA ACTIVITY LOGGER (ISOLATED DATABASE)
+// =========================================================================
+function _getNarraDatabaseFolder() {
+  const props = PropertiesService.getScriptProperties();
+  let isDevMode = false;
+  try {
+    let service = ScriptApp.getService();
+    if (service && service.getUrl()) {
+      isDevMode = service.getUrl().toLowerCase().endsWith("/dev");
+    }
+  } catch (err) {
+    isDevMode = false;
+  }
+  
+  let folderId = null;
+  if (isDevMode) {
+    folderId = props.getProperty('DATABASE_FOLDER_ID_DEV') || props.getProperty('DATABASE_FOLDER_ID');
+  }
+  if (!folderId) {
+    folderId = props.getProperty('DATABASE_FOLDER_ID') || DATABASE_FOLDER_ID;
+  }
+  if (!folderId) {
+    throw new Error("Database folder property for Narra is not configured in Script Properties.");
+  }
+  return DriveApp.getFolderById(folderId);
+}
+
+function logNarraActivity(action, details, sessionToken = null) {
+  try {
+    let now = new Date();
+    let year = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy");
+    let sheetName = "Activity_Logs_Narra_" + year;
+    let folder = _getNarraDatabaseFolder();
+
+    let ss = null;
+    let files = folder.getFilesByName(sheetName);
+    if (files.hasNext()) {
+      ss = SpreadsheetApp.open(files.next());
+    } else {
+      ss = SpreadsheetApp.create(sheetName);
+      DriveApp.getFileById(ss.getId()).moveTo(folder);
+    }
+
+    let sheet = ss.getSheetByName("Logs");
+    if (!sheet) {
+      let defaultSheet = ss.getSheetByName("Sheet1") || ss.getSheets()[0];
+      if (defaultSheet && defaultSheet.getLastRow() === 0) {
+        defaultSheet.setName("Logs");
+        sheet = defaultSheet;
+      } else {
+        sheet = ss.insertSheet("Logs", 0);
+      }
+      sheet.appendRow(["Timestamp", "Module", "User Email", "Action", "Details"]);
+      sheet.getRange("A1:E1").setFontWeight("bold").setBackground("#f3f3f3");
+      sheet.setFrozenRows(1);
+    }
+
+    let orphanSheet1 = ss.getSheetByName("Sheet1");
+    if (orphanSheet1 && orphanSheet1.getLastRow() === 0 && ss.getSheets().length > 1) {
+      try { ss.deleteSheet(orphanSheet1); } catch(err) {}
+    }
+
+    let userIdentifier = resolveUserIdentityString(sessionToken);
+    let timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
+
+    sheet.appendRow([timestamp, "NIGHTLY_NARRA", userIdentifier, action, details]);
+    SpreadsheetApp.flush();
+  } catch (e) {
+    console.warn("Failed to log Narra activity: " + e.message);
+  }
+}
+
+// =========================================================================
+// NIGHTLY NARRA PORTAL CONTROLLERS & DATA APIS
+// =========================================================================
+
+function webappGetNarraDateBoundsAndBanks() {
+  try {
+    let narraMin = Infinity;
+    let narraMax = 0;
+    let narraBanksMap = {};
+
+    const narraSheets = getDatabaseSheets("New_Narra_Data_");
+    narraSheets.forEach(sheet => {
+      if (sheet.getLastRow() > 1) {
+        let data = sheet.getDataRange().getValues();
+        let hRow = data[0].map(h => String(h).trim().toLowerCase().replace(/\s+/g, ''));
+        let dateColIdx = hRow.indexOf("voucherdate");
+        let bankColIdx = hRow.indexOf("bankname");
+        let srcColIdx = hRow.indexOf("sourcefile");
+
+        for (let i = 1; i < data.length; i++) {
+          if (dateColIdx > -1) {
+            let dateStr = data[i][dateColIdx];
+            if (dateStr) {
+              let dTime = new Date(dateStr).getTime();
+              if (!isNaN(dTime)) {
+                if (dTime < narraMin) narraMin = dTime;
+                if (dTime > narraMax) narraMax = dTime;
+              }
+            }
+          }
+          if (bankColIdx > -1) {
+            let bName = String(data[i][bankColIdx]).trim();
+            if (bName) {
+              if (!narraBanksMap[bName]) narraBanksMap[bName] = new Set();
+              let sourceFile = (srcColIdx > -1) ? String(data[i][srcColIdx]).toUpperCase() : "";
+              if (sourceFile.includes("KEYSYS")) narraBanksMap[bName].add("Keysys");
+              else if (sourceFile.includes("PINGCON")) narraBanksMap[bName].add("Pingcon");
+              else narraBanksMap[bName].add("Pingcon");
+            }
+          }
+        }
+      }
+    });
+
+    let narraBanksFormatted = [];
+    for (let b in narraBanksMap) {
+      narraBanksFormatted.push({ name: b, entities: Array.from(narraBanksMap[b]) });
+    }
+    narraBanksFormatted.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Dynamic Filename & Database Oldest Date Extraction for UI
+    let detectedStart = null;
+    let oldestVoucherDate = null;
+
+    for (let s = 0; s < narraSheets.length; s++) {
+      let sSheet = narraSheets[s];
+      let sLastRow = sSheet.getLastRow();
+      if (sLastRow > 1) {
+        let hRow = sSheet.getRange(1, 1, 1, sSheet.getLastColumn()).getValues()[0].map(h => String(h).trim().toLowerCase().replace(/\s+/g, ''));
+        let srcIdx = hRow.indexOf("sourcefile");
+        let vDateIdx = hRow.indexOf("voucherdate");
+
+        let sValues = sSheet.getRange(2, 1, sLastRow - 1, sSheet.getLastColumn()).getValues();
+        for (let r = 0; r < sValues.length; r++) {
+          if (!detectedStart && srcIdx > -1) {
+            let sFile = String(sValues[r][srcIdx] || "");
+            let m = sFile.match(/([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})\s+to\s+([A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4})/i);
+            if (m) {
+              let parsedD = new Date(m[1].replace(/,/g, ''));
+              if (!isNaN(parsedD.getTime())) detectedStart = parsedD;
+            }
+          }
+          if (vDateIdx > -1 && sValues[r][vDateIdx]) {
+            let vDate = new Date(sValues[r][vDateIdx]);
+            if (!isNaN(vDate.getTime()) && vDate.getFullYear() > 2000) {
+              if (!oldestVoucherDate || vDate < oldestVoucherDate) oldestVoucherDate = vDate;
+            }
+          }
+        }
+      }
+    }
+
+    let baseDate = detectedStart || oldestVoucherDate || new Date();
+    let rollingStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1, 0, 0, 0);
+    let rollingEnd = new Date(rollingStart.getFullYear() + 1, rollingStart.getMonth(), 0, 23, 59, 59);
+
+    return {
+      success: true,
+      min: Utilities.formatDate(rollingStart, Session.getScriptTimeZone(), "yyyy-MM-dd"),
+      max: Utilities.formatDate(rollingEnd, Session.getScriptTimeZone(), "yyyy-MM-dd"),
+      banks: narraBanksFormatted
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+function webappGetNarraUsers(sessionToken) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user || user.role !== "Super Admin") {
+    return { success: false, error: "Permission Denied: Only Super Admins can access User Management." };
+  }
+  return webappGetPortalUsers(sessionToken, "NARRA");
+}
+
+function webappUpdateNarraUserAccess(sessionToken, targetEmail, targetName, newRole, newStatus) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user || user.role !== "Super Admin") {
+    return { success: false, error: "Permission Denied: Only Super Admins can update roles." };
+  }
+  const result = webappUpdateUserAccess(sessionToken, targetEmail, targetName, newRole, newStatus, "NARRA");
+  if (result.success) {
+    logNarraActivity("User Access Updated", `Updated ${targetName} (${targetEmail}) -> Role: ${newRole} | Status: ${newStatus}`, sessionToken);
+  }
+  return result;
+}
+
+function webappGetNarraActivityLogs(sessionToken) {
+  try {
+    let folder = _getNarraDatabaseFolder();
+    let currentYear = new Date().getFullYear();
+    let sheetName = "Activity_Logs_Narra_" + currentYear;
+    let filesIter = folder.getFilesByName(sheetName);
+    let ss = null;
+
+    if (filesIter.hasNext()) {
+      ss = SpreadsheetApp.open(filesIter.next());
+    } else {
+      // Self-Healing: Automatically create the spreadsheet and headers if not present
+      ss = SpreadsheetApp.create(sheetName);
+      DriveApp.getFileById(ss.getId()).moveTo(folder);
+      let newSheet = ss.insertSheet("Logs", 0);
+      newSheet.appendRow(["Timestamp", "Module", "User Email", "Action", "Details"]);
+      newSheet.getRange("A1:E1").setFontWeight("bold").setBackground("#f3f3f3");
+      newSheet.setFrozenRows(1);
+      let orphanSheet1 = ss.getSheetByName("Sheet1");
+      if (orphanSheet1 && ss.getSheets().length > 1) {
+        try { ss.deleteSheet(orphanSheet1); } catch(e){}
+      }
+    }
+
+    let sheet = ss.getSheetByName("Logs") || ss.getSheets()[0];
+    let data = sheet.getDataRange().getValues();
+    let results = [];
+    let uniqueActions = new Set();
+
+    if (data.length > 1) {
+      for (let i = 1; i < data.length; i++) {
+        let r = data[i];
+        if (!r[0] && !r[3]) continue;
+        let actionStr = String(r[3] || "").trim();
+        if (actionStr) uniqueActions.add(actionStr);
+
+        results.push({
+          timestamp: r[0] instanceof Date ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss") : String(r[0] || ""),
+          module: String(r[1] || "NIGHTLY_NARRA"),
+          user: String(r[2] || ""),
+          action: actionStr,
+          details: String(r[4] || "")
+        });
+      }
+    }
+
+    results.sort((a, b) => {
+      let tA = new Date(a.timestamp).getTime() || 0;
+      let tB = new Date(b.timestamp).getTime() || 0;
+      return tB - tA;
+    });
+
+    return { 
+      success: true, 
+      logs: results, 
+      actions: Array.from(uniqueActions).sort() 
+    };
+  } catch (err) {
+    return { success: false, logs: [], actions: [], error: err.message };
+  }
+}
+
+function webappDeleteNarraActivityLogs(startStr, endStr, sessionToken) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user || user.role !== "Super Admin") {
+    return { success: false, error: "Permission Denied: Only Super Admins can delete audit logs." };
+  }
+
+  let lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    let startDate = new Date(startStr + " 00:00:00");
+    let endDate = new Date(endStr + " 23:59:59");
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) throw new Error("Invalid dates selected.");
+
+    let folder = _getNarraDatabaseFolder();
+    let startYear = startDate.getFullYear();
+    let endYear = endDate.getFullYear();
+    let totalDeleted = 0;
+
+    for (let y = startYear; y <= endYear; y++) {
+      let sheetName = "Activity_Logs_Narra_" + y;
+      let filesIter = folder.getFilesByName(sheetName);
+
+      if (filesIter.hasNext()) {
+        let sheet = SpreadsheetApp.open(filesIter.next()).getSheetByName("Logs");
+        if (sheet) {
+          let data = sheet.getDataRange().getValues();
+          let deletedInSheet = false;
+
+          for (let i = data.length - 1; i >= 1; i--) {
+            let logDate = new Date(data[i][0]);
+            if (logDate >= startDate && logDate <= endDate) {
+              sheet.deleteRow(i + 1);
+              totalDeleted++;
+              deletedInSheet = true;
+            }
+          }
+          if (deletedInSheet) SpreadsheetApp.flush();
+        }
+      }
+    }
+    return { success: true, deleted: totalDeleted };
+  } catch (e) {
+    return { success: false, error: e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+// One-time utility runner to immediately unlock Nightly Narra if stuck
+function resetNarraLock() {
+  clearReportLock("NARRA");
+  deleteTriggersByName("resumeNightlyNarraBatch");
+  PropertiesService.getScriptProperties().deleteProperty("PENDING_NIGHTLY_NARRA");
+  PropertiesService.getScriptProperties().deleteProperty("CANCEL_NIGHTLY_NARRA");
+  console.log("SUCCESS: Nightly Narra locks have been completely erased. Portal unlocked!");
+}

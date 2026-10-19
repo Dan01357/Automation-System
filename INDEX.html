@@ -262,8 +262,6 @@
       <option value="SKU">Missing SKU Mapping</option>
       <option value="AE_EMAILS">Email Address of AEs</option>
       <option value="CPP">Customer Payment Performance</option>
-      <option value="NEW_NARRA">Standard Narra Database</option> <!-- ADD THIS LINE -->
-      
     </select>
 
     <label>Select Excel/CSV File:</label>
@@ -301,7 +299,6 @@
       <option value="EWT_CLIENT_REPORT">Send All EWT Client Reports</option>
       <option value="CHECK_PO_PAYMENT">Check PO Payment Status</option>
       <option value="CPP_REPORT">Send Customer Payment Performance</option>
-      <option value="NIGHTLY_NARRA">Nightly Narra</option>
     </select>
 
     <div id="entityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
@@ -341,28 +338,7 @@
         </div>
       </div>
     </div>
-    <div id="narraEntityContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
-      <label style="margin-top: 0; margin-bottom: 8px;">Select Entities to Include:</label>
-      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
-        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="narraEntity" value="Pingcon" checked onchange="filterNarraBanks()"> Pingcon</label>
-          <label style="margin: 0; font-weight: normal;"><input type="checkbox" name="narraEntity" value="Keysys" checked onchange="filterNarraBanks()"> Keysys</label>
-        </div>
-      </div>
-    </div>
-    <div id="narraBankContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
-      <label style="margin-top: 0; margin-bottom: 8px;">Select Banks to Include:</label>
-      <div style="margin-bottom: 8px; font-size: 12px; display: flex; align-items: center;">
-        <div>
-          <a href="#" onclick="selectAllBanks(true); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Select All</a> | 
-          <a href="#" onclick="selectAllBanks(false); return false;" style="color: #F50057; text-decoration: none; font-weight: bold;">Clear Selection</a>
-        </div>
-        <div id="selectedBankCountDisplay" style="margin-left: auto; font-weight: bold; color: #F50057; background: #ffe6ee; padding: 2px 8px; border-radius: 4px;">0 selected</div>
-      </div>
-      <div id="narraBankList" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 5px; font-size: 13px; display: flex; flex-direction: column; gap: 4px;">
-        <span style="color: #888;">Loading Banks...</span>
-      </div>
-    </div>
+    
     <div id="aeContainer" style="display: none; margin-top: 15px; background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
       <label id="aeLabel" style="margin-top: 0; margin-bottom: 8px;">Select Account Executives:</label>
       <input type="text" id="aeSearchInput" placeholder="Search AE..." style="margin-bottom: 8px; padding: 5px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box;" onkeyup="filterAEs()">
@@ -469,21 +445,7 @@
 
           
           
-          // Populate Narra Bank Checkboxes
-          let bankListDiv = document.getElementById("narraBankList");
-          if (bankListDiv) {
-              bankListDiv.innerHTML = "";
-              globalNarraBanks.forEach(bObj => {
-                  let lbl = document.createElement("label");
-                  lbl.className = "narra-bank-item";
-                  lbl.style.margin = "0"; lbl.style.fontWeight = "normal"; lbl.style.cursor = "pointer";
-                  lbl.setAttribute("data-entities", JSON.stringify(bObj.entities));
-                  lbl.innerHTML = `<input type="checkbox" name="narraBank" value="${bObj.name.replace(/"/g, '&quot;')}" checked onchange="updateSelectedBankCount()"> <span>${bObj.name}</span>`;
-                  bankListDiv.appendChild(lbl);
-              });
-              if (globalNarraBanks.length === 0) bankListDiv.innerHTML = "<span style='color:red;'>No Banks found in Database.</span>";
-              filterNarraBanks(); // Initialize filter and count
-          }
+          
 
           let yearSelect = document.getElementById("yearSelect");
           if (yearSelect) {
@@ -720,41 +682,7 @@
       }
     }
 
-    function selectAllBanks(check) {
-      const labels = document.querySelectorAll('#narraBankList .narra-bank-item');
-      labels.forEach(lbl => {
-          if (lbl.style.display !== "none") {
-              lbl.querySelector('input').checked = check;
-          }
-      });
-      updateSelectedBankCount();
-    }
-
-    function updateSelectedBankCount() {
-      const countDisplay = document.getElementById("selectedBankCountDisplay");
-      if (countDisplay) {
-         const checkedCount = document.querySelectorAll('#narraBankList input[name="narraBank"]:checked').length;
-         countDisplay.innerText = checkedCount + " selected";
-      }
-    }
     
-    function filterNarraBanks() {
-      const checkedEntities = Array.from(document.querySelectorAll('input[name="narraEntity"]:checked')).map(cb => cb.value.toUpperCase());
-      const labels = document.querySelectorAll('#narraBankList .narra-bank-item');
-      
-      labels.forEach(lbl => {
-          const bankEntities = JSON.parse(lbl.getAttribute("data-entities") || "[]").map(e => String(e).toUpperCase());
-          const matches = bankEntities.some(entity => checkedEntities.includes(entity));
-          
-          if (matches) {
-              lbl.style.display = "block";
-          } else {
-              lbl.style.display = "none";
-              lbl.querySelector("input").checked = false;
-          }
-      });
-      updateSelectedBankCount();
-    }
 
     function toggleDateVisibility() {
       const action = document.getElementById("reportAction").value;
@@ -821,43 +749,26 @@
         entityContainer.style.display = "none";
         document.getElementById("salesEntityContainer").style.display = "block";
         document.getElementById("ewtEntityContainer").style.display = "none";
-        document.getElementById("narraEntityContainer").style.display = "none";
-        document.getElementById("narraBankContainer").style.display = "none";
         aeContainer.style.display = "block";
       } else if (action === "UNPAID_DR_AE" || action === "UNPAID_DR_CUST" || action === "UNPAID_DR_OVERDUE" || action === "BUY_SELL_REPORT" || action === "COMMISSION_REPORT" || action === "CPP_REPORT") {
         entityContainer.style.display = "block";
         document.getElementById("salesEntityContainer").style.display = "none";
         document.getElementById("ewtEntityContainer").style.display = "none";
-        document.getElementById("narraEntityContainer").style.display = "none";
-        document.getElementById("narraBankContainer").style.display = "none";
         aeContainer.style.display = "block";
       } else if (action === "EWT_CLIENT_REPORT") {
         entityContainer.style.display = "block";
         document.getElementById("salesEntityContainer").style.display = "none";
         document.getElementById("ewtEntityContainer").style.display = "none";
-        document.getElementById("narraEntityContainer").style.display = "none";
-        document.getElementById("narraBankContainer").style.display = "none";
         aeContainer.style.display = "none";
       } else if (action === "EWT_SUPPLIER_REPORT" || action === "PURCHASE_REPORT") {
         entityContainer.style.display = "none";
         document.getElementById("salesEntityContainer").style.display = "none";
         document.getElementById("ewtEntityContainer").style.display = "block";
-        document.getElementById("narraEntityContainer").style.display = "none";
-        document.getElementById("narraBankContainer").style.display = "none";
-        aeContainer.style.display = "none";
-      } else if (action === "NIGHTLY_NARRA") {
-        entityContainer.style.display = "none";
-        document.getElementById("salesEntityContainer").style.display = "none";
-        document.getElementById("ewtEntityContainer").style.display = "none";
-        document.getElementById("narraEntityContainer").style.display = "block";
-        document.getElementById("narraBankContainer").style.display = "block";
         aeContainer.style.display = "none";
       } else {
         entityContainer.style.display = "none";
         document.getElementById("salesEntityContainer").style.display = "none";
         document.getElementById("ewtEntityContainer").style.display = "none";
-        document.getElementById("narraEntityContainer").style.display = "none";
-        document.getElementById("narraBankContainer").style.display = "none";
         aeContainer.style.display = "none";
       }
     }
@@ -1166,12 +1077,6 @@
       }
 
       let selectedBanks = [];
-      if (action === "NIGHTLY_NARRA") {
-          document.querySelectorAll('input[name="narraBank"]:checked').forEach(cb => selectedBanks.push(cb.value));
-          if (selectedBanks.length === 0) {
-              showStatus(statusDiv, "Please select at least one Bank for the Report.", "error"); return;
-          }
-      }
       
       if (action === "SALES_REPORT_CONSOLIDATED" || action === "UNPAID_DR_AE" || action === "UNPAID_DR_CUST" || action === "UNPAID_DR_OVERDUE" || action === "BUY_SELL_REPORT" || action === "COMMISSION_REPORT" || action === "CPP_REPORT") {
         const aeCheckboxes = document.querySelectorAll('.ae-item input[name="salesAE"]:checked');

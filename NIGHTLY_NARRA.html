@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nightly Narra & Treasury Portal</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+    
+    :root {
+      --primary-color: #111c43;
+      --primary-hover: #1b2a60;
+      --accent-color: #F50057;
+      --sidebar-bg: #111c43;
+      --shadow-color: rgba(17, 28, 67, 0.15);
+    }
+    
+    body { font-family: 'Nunito', sans-serif; background-color: #f3f6f9; margin: 0; padding: 0; color: #495057; }
+    .app-container { display: flex; height: 100vh; width: 100vw; overflow: hidden; }
+    
+    .sidebar { width: 260px; background-color: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; box-shadow: 2px 0 10px rgba(0,0,0,0.1); transition: margin-left 0.3s ease; }
+    .sidebar.collapsed { margin-left: -260px; }
+    .sidebar-header { padding: 25px 20px; font-size: 20px; font-weight: 800; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 10px;}
+    
+    .nav-tabs { display: flex; flex-direction: column; padding: 15px 0; width: 100%; }
+    .nav-tab { padding: 14px 22px; cursor: pointer; font-weight: 600; color: #a3aed1; border-left: 4px solid transparent; transition: 0.3s; font-size: 14px; display: flex; align-items: center; gap: 12px;}
+    .nav-tab:hover { color: #fff; background-color: rgba(255,255,255,0.05); }
+    .nav-tab.active { color: #fff; border-left-color: var(--accent-color); background-color: rgba(255,255,255,0.08); font-weight: 700; }
+
+    .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; background-color: #f3f6f9; }
+    .top-header { background: #fff; padding: 15px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 900; height: 42px;}
+    .menu-toggle-btn { background: transparent; border: none; color: var(--sidebar-bg); cursor: pointer; padding: 6px; margin-right: 15px; transition: 0.2s; border-radius: 6px; }
+    .menu-toggle-btn:hover { background: rgba(17, 28, 67, 0.08); }
+    .content-wrapper { padding: 25px 30px 80px 30px; flex-grow: 1; }
+
+    .card { background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.03); border: 1px solid #eef2f7; margin-bottom: 25px; }
+    .primary-btn { background-color: var(--accent-color); color: white; border: none; padding: 12px 25px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: 0.3s; font-family: 'Nunito', sans-serif;}
+    .primary-btn:hover:not(:disabled) { background-color: #d8004d; transform: translateY(-1px); }
+    .primary-btn:disabled { background-color: #a3aed1; cursor: not-allowed; }
+    .secondary-btn { background-color: #fff; color: #495057; border: 1px solid #e2e5ec; padding: 10px 20px; font-size: 13px; font-weight: 700; border-radius: 6px; cursor: pointer; transition: 0.3s; font-family: 'Nunito', sans-serif;}
+    .secondary-btn:hover:not(:disabled) { background-color: #f8f9fa; color: var(--sidebar-bg); border-color: #d1d7e2; }
+
+    .date-input { width: 100%; padding: 10px 14px; border: 1px solid #e2e5ec; border-radius: 6px; font-size: 13.5px; outline: none; background: #fff; font-family: 'Nunito', sans-serif; font-weight: 600; box-sizing: border-box; }
+    .date-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(245, 0, 87, 0.15); }
+    
+    .status-banner { margin-top: 15px; font-size: 13px; font-weight: bold; text-align: center; padding: 12px; border-radius: 6px; display: none; }
+    .status-banner.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+    .status-banner.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+    .status-banner.loading { background-color: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+    .badge-soft { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; display: inline-flex; align-items: center; gap: 3px; }
+    .badge-success { background: #e6f4ea; color: #1e8e3e; }
+    .badge-danger { background: #fff0f0; color: #d93025; }
+    .badge-secondary { background: #f1f3f4; color: #5f6368; }
+
+    .ewt-pro-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; background: #fff; }
+    .ewt-pro-table th { background: #f8f9fa; color: #6b778c; font-weight: 800; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 10px 8px; border-bottom: 2px solid #eef2f7; text-align: left; }
+    .ewt-pro-table td { padding: 10px 8px; border-bottom: 1px solid #eef2f7; color: #495057; font-weight: 600; }
+    .ewt-pro-table tbody tr:hover { background-color: #fcfcfd; }
+
+    .ewt-action-bar { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 12px 18px; border-radius: 8px 8px 0 0; border: 1px solid #eef2f7; border-bottom: none; flex-wrap: wrap; gap: 15px; }
+    .pagination-controls { display: flex; justify-content: space-between; align-items: center; padding: 15px 0 0 0; background: transparent; border-top: 1px solid #eef2f7; margin-top: 20px; font-size: 13px; font-weight: 600; color: #8a96a3; }
+    .page-btn { background: #fff; border: 1px solid #e2e5ec; padding: 6px 14px; cursor: pointer; border-radius: 4px; font-weight: 700; color: #495057; transition: 0.2s; font-family: 'Nunito', sans-serif; }
+    .page-btn:hover:not(:disabled) { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+    .page-btn:disabled { color: #adb5bd; cursor: not-allowed; background: #f8f9fa; border-color: #eef2f7; }
+    .ewt-btn { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 800; border: none; cursor: pointer; transition: all 0.2s ease; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-family: 'Nunito', sans-serif; }
+    .ewt-btn-edit { background: #e8f0fe; color: #1a73e8; border: 1px solid #d2e3fc; }
+    .ewt-btn-edit:hover { background: #d2e3fc; transform: translateY(-1px); }
+    .timeline { position: relative; padding-left: 20px; }
+    .timeline::after { content: ''; position: absolute; width: 2px; background-color: #eef2f7; top: 0; bottom: 0; left: 6px; }
+    .timeline-item { padding: 10px 20px; position: relative; }
+    .timeline-item::after { content: ''; position: absolute; width: 12px; height: 12px; background-color: white; border: 3px solid var(--accent-color); top: 15px; left: 0px; border-radius: 50%; z-index: 1; }
+    .timeline-content { padding: 14px 18px; background-color: #fff; border-radius: 8px; border: 1px solid #eef2f7; }
+
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- AUTHENTICATION OVERLAY (HR CENTER API GATE) -->
+  <div id="otp-overlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(17, 28, 67, 0.95); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+    <script>
+      (function() {
+        const exp = localStorage.getItem('pf_exp_narra');
+        const tok = localStorage.getItem('pf_tok_narra');
+        if (tok && exp && Date.now() < parseInt(exp, 10)) {
+          document.getElementById('otp-overlay').style.display = 'none';
+        }
+      })();
+    </script>
+    <div style="background:#fff; padding:40px 30px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.2); text-align:center; max-width:420px; width:90%;">
+      <div style="background:rgba(17, 28, 67, 0.08); width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111c43" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+
+      <h2 style="margin-top:0; color:#111c43; font-weight:800;">Treasury Security Gate</h2>
+      <p style="color:#8a96a3; font-size:14px; font-weight:600; margin-bottom: 20px;">Please enter your company work email to access the <strong>Nightly Narra Portal</strong>.</p>
+      
+      <div id="otp-step-1">
+        <input type="email" id="user-email-input" placeholder="e.g. yourname@company.com" style="padding:13px 15px; font-size:14px; font-weight:600; color:#111c43; width:100%; box-sizing:border-box; border:1px solid #e2e5ec; background:#f8f9fa; border-radius:6px; outline:none; margin-bottom: 15px;">
+        <button type="button" class="primary-btn" onclick="sendOtp()" id="btn-send-otp" style="width:100%; margin:0;">Send Access Code</button>
+      </div>
+      
+      <div id="otp-step-2" style="display:none;">
+        <div id="otp-target-email" style="font-size: 13px; color: #5f6368; font-weight: bold; margin-bottom: 12px;"></div>
+        <input type="text" id="otp-input" placeholder="Enter 6-digit code" maxlength="6" style="padding:14px; font-size:22px; font-weight:bold; color:#111c43; text-align:center; width:100%; box-sizing:border-box; letter-spacing:6px; border:1px solid #e2e5ec; background:#f8f9fa; border-radius:6px; outline:none; margin-bottom:15px;">
+        <button type="button" class="primary-btn" onclick="verifyOtp()" id="btn-verify-otp" style="width:100%; margin:0;">Verify Code</button>
+        <button type="button" class="secondary-btn" onclick="sendOtp()" id="btn-resend-otp" style="margin-top:10px; width:100%; display:none;">Resend Code</button>
+      </div>
+
+      <div id="otp-timer" style="margin-top:15px; font-size:13px; font-weight:bold; color:#d93025; display:none;"></div>
+      <div id="otp-msg" style="margin-top:15px; font-size:13px; font-weight:bold;"></div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F50057" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <span>Nightly Narra</span>
+      </div>
+      
+      <div class="nav-tabs">
+        <div id="tab-run" class="nav-tab active" onclick="switchTab('run')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+           Run Nightly Narra
+        </div>
+        <div id="tab-upload" class="nav-tab" onclick="switchTab('upload')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+           Upload Database
+        </div>
+        <div id="tab-activity" class="nav-tab" onclick="switchTab('activity')">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+           Audit Logs
+        </div>
+        <div id="tab-user-mgmt" class="nav-tab" onclick="switchTab('user-mgmt')" style="display:none;">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+           User Management
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <header class="top-header">
+         <div style="display: flex; align-items: center;">
+           <button class="menu-toggle-btn" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')">
+             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+           </button>
+           <h3 style="margin:0; color:#111c43; font-weight:800; font-size:16px;">Consolidated Treasury Portal</h3>
+         </div>
+         
+         <div id="header-user-badge" style="display:none; align-items:center; gap:12px;">
+            <span id="header-user-display" style="font-size:13px; font-weight:800; color:#111c43;"></span>
+            <button type="button" onclick="handleLogout()" class="secondary-btn" style="padding:4px 12px; font-size:11px; margin:0; border-radius:15px;">Logout</button>
+         </div>
+      </header>
+
+      <div class="content-wrapper">
+        
+        <!-- SECTION 1: RUN NIGHTLY NARRA -->
+        <div id="sec-run" class="card" style="display:block; max-width:850px; margin:0 auto 25px auto;">
+          <h3 style="margin-top:0; color:#111c43; font-weight:800;">Generate & Dispatch Nightly Narra</h3>
+          <p style="font-size:13px; color:#8a96a3; margin-bottom:20px;">Generates password-protected bank reports across all entities and dispatches them to distribution lists.</p>
+          
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:20px;">
+            <label style="font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:8px; margin:0; font-size:13px;">
+              <input type="checkbox" id="testModeCheckbox"> <strong>Enable Test Mode</strong> (Appends <code>.test</code> to outgoing emails)
+            </label>
+          </div>
+
+          <!-- Date Filters -->
+          <div style="display:flex; gap:15px; margin-bottom:20px;">
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:6px; display:block;">Start Voucher Date</label>
+              <input type="text" id="reportStartDate" class="date-input" placeholder="Loading...">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:6px; display:block;">End Voucher Date</label>
+              <input type="text" id="reportEndDate" class="date-input" placeholder="Loading...">
+            </div>
+          </div>
+
+          <!-- Entity Selection -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:20px;">
+            <label style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:8px; display:block;">Select Entities</label>
+            <div style="display:flex; gap:20px; font-size:13px;">
+              <label style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="narraEntity" value="Pingcon" checked onchange="filterBanksByEntity()"> Pingcon Group
+              </label>
+              <label style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" name="narraEntity" value="Keysys" checked onchange="filterBanksByEntity()"> Keysys Group
+              </label>
+            </div>
+          </div>
+
+          <!-- Bank Selection -->
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-bottom:25px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <label style="font-size:11px; font-weight:800; color:#64748b; text-transform:uppercase; margin:0;">Select Bank Buckets to Process</label>
+              <div style="display:flex; align-items:center; gap:12px; font-size:12px;">
+                <a href="javascript:void(0)" onclick="selectAllBanks(true)" style="color:#F50057; text-decoration:none; font-weight:bold;">Select All</a>
+                <span style="color:#cbd5e1;">|</span>
+                <a href="javascript:void(0)" onclick="selectAllBanks(false)" style="color:#64748b; text-decoration:none;">Clear</a>
+                <span id="selectedBankCountDisplay" style="background:#ffe6ee; color:#F50057; font-weight:bold; padding:2px 8px; border-radius:4px; margin-left:6px;">0 selected</span>
+              </div>
+            </div>
+            <div id="narraBankList" style="max-height:180px; overflow-y:auto; border:1px solid #e2e8f0; background:#fff; border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:6px; font-size:12.5px;">
+              <span style="color:#8a96a3;">Loading Banks...</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; gap:12px;">
+            <button type="button" id="btn-run-narra" class="primary-btn" onclick="executeNightlyNarra()" style="flex:2; margin:0;">Run Nightly Narra Batch</button>
+            <button type="button" id="btn-cancel-narra" class="secondary-btn" onclick="cancelNightlyNarra()" style="flex:1; margin:0;">Cancel Batch</button>
+          </div>
+          
+          <div id="run-status" class="status-banner"></div>
+        </div>
+
+        <!-- SECTION 2: UPLOAD DATABASE -->
+        <div id="sec-upload" class="card" style="display:none; max-width:650px; margin:0 auto 25px auto;">
+          <h3 style="margin-top:0; color:#111c43; font-weight:800;">Upload Standard Narra Database</h3>
+          <p style="font-size:13px; color:#8a96a3; margin-bottom:20px;">Upload newly exported voucher files. The system automatically decrypts and appends them to the master ledger.</p>
+
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:20px;">
+            <input type="file" id="narraFileInput" accept=".xlsx, .xls, .csv" multiple style="width:100%; margin-bottom:15px; font-size:13px;">
+            
+            <label style="font-weight:normal; cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom:20px; font-size:13px; color:#475569;">
+              <input type="checkbox" id="requirePasswordCheck" checked> My Excel files are password protected
+            </label>
+
+            <button type="button" class="primary-btn" id="btn-upload-narra" onclick="handleNarraUpload()" style="width:100%; margin:0;">Upload & Import Data</button>
+          </div>
+          <div id="upload-status" class="status-banner"></div>
+        </div>
+
+        <!-- SECTION 3: AUDIT LOGS (MATCHED WITH 2307 PORTAL) -->
+        <div id="sec-activity" class="card" style="display:none; max-width:1000px; margin:0 auto 25px auto;">
+          <h3 style="margin-top:0; color:#111c43; font-weight:800; border-bottom:2px solid #eef2f7; padding-bottom:15px;">Recent System Activity</h3>
+
+          <!-- Search and Limit Controls -->
+          <div class="ewt-action-bar" style="border:none; padding:0 0 15px 0; background:transparent;">
+            <div style="display:flex; gap:20px; align-items:center; font-size:13px; width:100%;">
+              <input type="text" id="logSearchInput" placeholder="Search anywhere..." onkeyup="filterActivityLogs()" autocomplete="off" style="padding:8px 12px; height:36px; box-sizing:border-box; border:1px solid #e2e5ec; border-radius:6px; font-size:13px; font-family:'Nunito',sans-serif; outline:none; background:#fff; width:250px; max-width:300px;">
+              <div style="margin-left:auto; display:flex; align-items:center; gap:5px;">
+                <label for="logRowsPerPage" style="font-weight:bold; color:#5f6368;">Show: </label>
+                <select id="logRowsPerPage" onchange="changeLogRowsPerPage()" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; cursor:pointer; font-family:'Nunito',sans-serif; font-size:12px; background:#fff;">
+                  <option value="5" selected>5</option>
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity Filter Card -->
+          <div style="display:flex; gap:15px; margin-bottom:25px; align-items:flex-end; flex-wrap:wrap; background:#f8fafc; padding:15px 20px; border-radius:8px; border:1px solid #eef2f7; box-sizing:border-box;">
+            <div style="flex:1.5; min-width:200px;">
+              <label style="font-size:11px; font-weight:800; color:#8a96a3; text-transform:uppercase; margin-bottom:5px; display:block;">Filter by Action</label>
+              <select id="logActionFilter" onchange="filterActivityLogs()" style="width:100%; height:42px; padding:10px 15px; border:1px solid #e2e5ec; border-radius:6px; font-size:13.5px; outline:none; background:#fff; font-family:'Nunito',sans-serif; font-weight:600; color:#111c43; cursor:pointer; box-sizing:border-box;">
+                <option value="">All Actions</option>
+              </select>
+            </div>
+            <div style="flex:1; min-width:140px;">
+              <label style="font-size:11px; font-weight:800; color:#8a96a3; text-transform:uppercase; margin-bottom:5px; display:block;">Start Date (MM/DD/YYYY)</label>
+              <input type="text" id="logStartDate" class="date-input" placeholder="MM/DD/YYYY" onchange="filterActivityLogs()" style="height:42px;">
+            </div>
+            <div style="flex:1; min-width:140px;">
+              <label style="font-size:11px; font-weight:800; color:#8a96a3; text-transform:uppercase; margin-bottom:5px; display:block;">End Date (MM/DD/YYYY)</label>
+              <input type="text" id="logEndDate" class="date-input" placeholder="MM/DD/YYYY" onchange="filterActivityLogs()" style="height:42px;">
+            </div>
+            <div style="display:flex; gap:8px; flex-shrink:0;">
+              <button type="button" class="secondary-btn" onclick="clearLogFilters()" style="height:42px; padding:0 16px; margin:0;">Clear Filters</button>
+              <button type="button" class="primary-btn" id="btn-delete-narra-logs" onclick="openDeleteLogsModal()" style="height:42px; padding:0 16px; margin:0; background-color:#d93025; font-size:12.5px; width:auto; display:none;">Delete Logs</button>
+            </div>
+          </div>
+
+          <div id="activity-timeline" class="timeline">
+            <p style="color:#8a96a3; font-style:italic;">Loading activity logs...</p>
+          </div>
+
+          <div class="pagination-controls" id="log-pagination-controls" style="display:none;">
+            <span id="log-page-info" style="color:#5f6368;"></span>
+            <div style="display:flex; gap:10px;">
+              <button class="page-btn" id="btn-log-prev" onclick="changeLogPage(-1)">Previous</button>
+              <button class="page-btn" id="btn-log-next" onclick="changeLogPage(1)">Next</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DELETE LOGS MODAL -->
+        <div id="delete-logs-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; backdrop-filter:blur(2px);">
+          <div style="background:#fff; width:90%; max-width:450px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); overflow:hidden;">
+              <div style="background:#f8f9fa; padding:15px 20px; border-bottom:1px solid #ddd;">
+                  <h3 style="margin:0; color:#d93025; font-size:16px; font-weight:800;">⚠️ Delete Activity Logs</h3>
+              </div>
+              <div style="padding:20px; font-size:14px; color:#3c4043; line-height:1.5;">
+                  <p style="margin:0 0 15px 0;">Select the date range of the logs you wish to <strong>permanently delete</strong>.</p>
+                  <div style="display:flex; gap:12px; margin-top:15px;">
+                      <div style="flex:1;">
+                          <label style="font-size:11px; font-weight:800; color:#8a96a3; text-transform:uppercase; margin-bottom:5px; display:block;">Start Date</label>
+                          <input type="text" id="delModalStartDate" class="date-input" placeholder="MM/DD/YYYY" style="height:38px;">
+                      </div>
+                      <div style="flex:1;">
+                          <label style="font-size:11px; font-weight:800; color:#8a96a3; text-transform:uppercase; margin-bottom:5px; display:block;">End Date</label>
+                          <input type="text" id="delModalEndDate" class="date-input" placeholder="MM/DD/YYYY" style="height:38px;">
+                      </div>
+                  </div>
+              </div>
+              <div style="padding:15px 20px; border-top:1px solid #ddd; background:#f8f9fa; display:flex; justify-content:flex-end; gap:10px;">
+                  <button type="button" class="secondary-btn" onclick="closeDeleteLogsModal()" style="padding:8px 16px; margin:0;">Cancel</button>
+                  <button type="button" class="primary-btn" id="confirmDeleteLogsBtn" onclick="executeDeleteNarraLogs()" style="padding:8px 16px; margin:0; width:auto; background-color:#d93025;">Confirm Delete</button>
+              </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4: USER MANAGEMENT (MATCHED WITH 2307 PORTAL) -->
+        <div id="sec-user-mgmt" class="card" style="display:none; max-width:1100px; margin:0 auto 25px auto;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #eef2f7; padding-bottom:15px; margin-bottom:20px;">
+            <div>
+              <h3 style="margin:0; color:#111c43; font-weight:800;">User Management & Role Permissions</h3>
+              <p style="margin:5px 0 0 0; color:#8a96a3; font-size:13px;">Manage portal access, assign roles, and deactivate employees without touching the HR Masterlist.</p>
+            </div>
+            <button type="button" class="secondary-btn" onclick="loadUserManagementData()" style="padding:8px 16px; margin:0; font-size:12px; display:flex; align-items:center; gap:6px;">↻ Refresh Roster</button>
+          </div>
+
+          <div class="ewt-action-bar" style="border:none; padding:0 0 15px 0; background:transparent; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="userMgmtSearchInput" placeholder="Search by name, email, department..." onkeyup="filterUserManagementTable()" autocomplete="off" style="padding:10px 15px; width:320px; border:1px solid #e2e5ec; border-radius:6px; font-family:'Nunito',sans-serif; font-size:13px; background:#fff; outline:none;">
+            <div style="display:flex; gap:10px; align-items:center; margin-left:auto;">
+              <label style="font-size:12px; font-weight:bold; color:#5f6368;">Filter Role:</label>
+              <select id="userMgmtRoleFilter" onchange="filterUserManagementTable()" style="padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-family:'Nunito',sans-serif; font-size:13px; background:#fff;">
+                <option value="">All Roles</option>
+                <option value="Super Admin">Super Admin</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Encoder">Encoder</option>
+                <option value="Viewer">Viewer</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="user-mgmt-loader" style="padding:30px; text-align:center; color:#1a73e8; font-weight:bold; display:none;">
+            <div class="spinner" style="width:22px; height:22px; margin-right:10px;"></div>
+            Fetching employee roster from Pingcon HR Center...
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="ewt-pro-table">
+              <thead>
+                <tr>
+                  <th style="width:50px;">SN</th>
+                  <th>Employee Name</th>
+                  <th>Work Email</th>
+                  <th>Department</th>
+                  <th style="width:160px;">Portal Role</th>
+                  <th style="width:140px; text-align:center;">Status</th>
+                  <th style="width:120px; text-align:center;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="user-mgmt-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let globalBanks = [];
+    let fpStart = null, fpEnd = null;
+    let windowNarraLogs = [];
+
+    // --- SESSION INITIALIZATION ---
+    function initPortalSession() {
+      const exp = localStorage.getItem('pf_exp_narra');
+      const tok = localStorage.getItem('pf_tok_narra');
+      const userStr = localStorage.getItem('pf_usr_narra');
+
+      if (tok && userStr && exp && Date.now() < parseInt(exp, 10)) {
+        try {
+          const user = JSON.parse(userStr);
+          sessionStorage.setItem('pf_user_token', tok);
+          sessionStorage.setItem('pf_user_data', userStr);
+          document.getElementById('otp-overlay').style.display = 'none';
+          updateHeaderUserProfile(user);
+          loadNarraDataBounds();
+          return true;
+        } catch(e) {}
+      } else {
+        localStorage.removeItem('pf_tok_narra');
+        localStorage.removeItem('pf_usr_narra');
+        localStorage.removeItem('pf_exp_narra');
+        document.getElementById('otp-overlay').style.display = 'flex';
+      }
+      return false;
+    }
+
+    initPortalSession();
+
+    function updateHeaderUserProfile(user) {
+      const badge = document.getElementById('header-user-display');
+      if (badge && user) {
+        badge.innerHTML = `👤 <strong>${user.name}</strong> <span style="color:#8a96a3;">(${user.role})</span>`;
+        document.getElementById('header-user-badge').style.display = 'flex';
+        
+        const isSuperAdmin = (user.role === 'Super Admin');
+        const userMgmtTab = document.getElementById('tab-user-mgmt');
+        if (userMgmtTab) userMgmtTab.style.display = isSuperAdmin ? 'flex' : 'none';
+
+        const delLogsBtn = document.getElementById('btn-delete-narra-logs');
+        if (delLogsBtn) delLogsBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('pf_tok_narra');
+      localStorage.removeItem('pf_usr_narra');
+      localStorage.removeItem('pf_exp_narra');
+      sessionStorage.clear();
+      window.location.reload();
+    }
+
+    // --- OTP AUTHENTICATION ---
+    let otpInterval;
+    function sendOtp() {
+      const email = document.getElementById('user-email-input').value.trim().toLowerCase();
+      if (!email || !email.includes('@')) {
+        document.getElementById('otp-msg').style.color = '#d93025';
+        document.getElementById('otp-msg').innerText = 'Please enter a valid company work email.';
+        return;
+      }
+
+      const btn = document.getElementById('btn-send-otp');
+      btn.innerText = 'Checking HR Record...';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              document.getElementById('otp-step-1').style.display = 'none';
+              document.getElementById('otp-step-2').style.display = 'block';
+              document.getElementById('otp-target-email').innerText = 'Code sent to: ' + email;
+              document.getElementById('otp-msg').style.color = '#1e7e34';
+              document.getElementById('otp-msg').innerText = res.message;
+              startOtpTimer();
+           } else {
+              btn.innerText = 'Send Access Code';
+              btn.disabled = false;
+              document.getElementById('otp-msg').style.color = '#d93025';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           btn.innerText = 'Send Access Code';
+           btn.disabled = false;
+           document.getElementById('otp-msg').style.color = '#d93025';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappSendUserOtp(email, 'Nightly Narra Portal', 'NARRA');
+    }
+
+    function startOtpTimer() {
+      clearInterval(otpInterval);
+      let timeLeft = 120;
+      const timerEl = document.getElementById('otp-timer');
+      timerEl.style.display = 'block';
+
+      otpInterval = setInterval(function() {
+        timeLeft--;
+        let m = Math.floor(timeLeft / 60);
+        let s = timeLeft % 60;
+        timerEl.innerText = `Code expires in: ${m}:${s < 10 ? '0' : ''}${s}`;
+        if (timeLeft <= 0) {
+          clearInterval(otpInterval);
+          timerEl.style.display = 'none';
+          document.getElementById('otp-msg').style.color = '#d93025';
+          document.getElementById('otp-msg').innerText = 'Code expired. Please request a new one.';
+          document.getElementById('btn-verify-otp').disabled = true;
+          document.getElementById('btn-resend-otp').style.display = 'inline-block';
+        }
+      }, 1000);
+    }
+
+    function verifyOtp() {
+      const email = document.getElementById('user-email-input').value.trim().toLowerCase();
+      const code = document.getElementById('otp-input').value.trim();
+      if (!code || code.length < 5) return;
+
+      const btn = document.getElementById('btn-verify-otp');
+      btn.innerText = 'Verifying...';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+           if (res.success) {
+              clearInterval(otpInterval);
+              const expTime = (Date.now() + 6 * 60 * 60 * 1000).toString();
+              localStorage.setItem('pf_tok_narra', res.token);
+              localStorage.setItem('pf_usr_narra', JSON.stringify(res.user));
+              localStorage.setItem('pf_exp_narra', expTime);
+
+              sessionStorage.setItem('pf_user_token', res.token);
+              sessionStorage.setItem('pf_user_data', JSON.stringify(res.user));
+
+              document.getElementById('otp-overlay').style.display = 'none';
+              updateHeaderUserProfile(res.user);
+              loadNarraDataBounds();
+           } else {
+              btn.innerText = 'Verify Code';
+              btn.disabled = false;
+              document.getElementById('otp-msg').style.color = '#d93025';
+              document.getElementById('otp-msg').innerText = res.message;
+           }
+        })
+        .withFailureHandler(function(err) {
+           btn.innerText = 'Verify Code';
+           btn.disabled = false;
+           document.getElementById('otp-msg').style.color = '#d93025';
+           document.getElementById('otp-msg').innerText = err.message;
+        })
+        .webappVerifyUserOtp(email, code, 'NARRA');
+    }
+
+    // --- NAVIGATION TABS ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      const targetTab = document.getElementById('tab-' + tabId);
+      if (targetTab) targetTab.classList.add('active');
+
+      document.querySelectorAll('.content-wrapper > .card').forEach(c => c.style.display = 'none');
+      const targetSec = document.getElementById('sec-' + tabId);
+      if (targetSec) targetSec.style.display = 'block';
+
+      if (tabId === 'activity') loadActivityLogs();
+      if (tabId === 'user-mgmt') loadUserManagementData();
+    }
+
+    // --- NIGHTLY NARRA DATA LOADER (REACTIVE DISPLAY) ---
+    function loadNarraDataBounds() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res.success) return;
+          globalBanks = res.banks || [];
+
+          // Reactively update existing calendar inputs without breaking DOM
+          if (fpStart && fpStart.setDate) {
+            fpStart.set("minDate", res.min);
+            fpStart.set("maxDate", res.max);
+            fpStart.setDate(res.min, true);
+          } else {
+            fpStart = flatpickr("#reportStartDate", {
+              dateFormat: "Y-m-d", altInput: true, altFormat: "m/d/Y",
+              defaultDate: res.min, minDate: res.min, maxDate: res.max
+            });
+          }
+
+          if (fpEnd && fpEnd.setDate) {
+            fpEnd.set("minDate", res.min);
+            fpEnd.set("maxDate", res.max);
+            fpEnd.setDate(res.max, true);
+          } else {
+            fpEnd = flatpickr("#reportEndDate", {
+              dateFormat: "Y-m-d", altInput: true, altFormat: "m/d/Y",
+              defaultDate: res.max, minDate: res.min, maxDate: res.max
+            });
+          }
+
+          renderBankList();
+        })
+        .webappGetNarraDateBoundsAndBanks();
+    }
+
+    function renderBankList() {
+      const container = document.getElementById('narraBankList');
+      container.innerHTML = "";
+
+      if (globalBanks.length === 0) {
+        container.innerHTML = "<span style='color:#8a96a3;'>No banks found in active database.</span>";
+        return;
+      }
+
+      globalBanks.forEach(b => {
+        const lbl = document.createElement('label');
+        lbl.className = 'narra-bank-item';
+        lbl.style.cssText = 'cursor:pointer; display:flex; align-items:center; gap:6px; margin:0;';
+        lbl.setAttribute('data-entities', JSON.stringify(b.entities));
+        lbl.innerHTML = `<input type="checkbox" name="narraBank" value="${b.name}" checked onchange="updateSelectedBankCount()"> <span>${b.name}</span>`;
+        container.appendChild(lbl);
+      });
+
+      filterBanksByEntity();
+    }
+
+    function filterBanksByEntity() {
+      const selectedEntities = Array.from(document.querySelectorAll('input[name="narraEntity"]:checked')).map(cb => cb.value.toUpperCase());
+      const bankItems = document.querySelectorAll('#narraBankList .narra-bank-item');
+
+      bankItems.forEach(item => {
+        const bankEntities = JSON.parse(item.getAttribute('data-entities') || '[]').map(e => e.toUpperCase());
+        const matches = bankEntities.some(e => selectedEntities.includes(e));
+        item.style.display = matches ? 'flex' : 'none';
+        if (!matches) item.querySelector('input').checked = false;
+      });
+
+      updateSelectedBankCount();
+    }
+
+    function selectAllBanks(check) {
+      document.querySelectorAll('#narraBankList .narra-bank-item').forEach(item => {
+        if (item.style.display !== 'none') item.querySelector('input').checked = check;
+      });
+      updateSelectedBankCount();
+    }
+
+    function updateSelectedBankCount() {
+      const count = document.querySelectorAll('#narraBankList input[name="narraBank"]:checked').length;
+      document.getElementById('selectedBankCountDisplay').innerText = `${count} selected`;
+    }
+
+    // --- BATCH RUNNER ---
+    function executeNightlyNarra() {
+      const statusDiv = document.getElementById('run-status');
+      const btn = document.getElementById('btn-run-narra');
+
+      const selectedEntities = Array.from(document.querySelectorAll('input[name="narraEntity"]:checked')).map(cb => cb.value);
+      const selectedBanks = Array.from(document.querySelectorAll('#narraBankList input[name="narraBank"]:checked')).map(cb => cb.value);
+      const isTestMode = document.getElementById('testModeCheckbox').checked;
+
+      if (selectedBanks.length === 0) {
+        statusDiv.className = 'status-banner error';
+        statusDiv.innerText = 'Please select at least one bank to process.';
+        return;
+      }
+
+      btn.disabled = true;
+      statusDiv.className = 'status-banner loading';
+      statusDiv.innerHTML = '<span class="spinner"></span> Initializing Nightly Narra batch in background...';
+
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          btn.disabled = false;
+          if (msg.startsWith('Success') || msg.includes('started')) {
+            statusDiv.className = 'status-banner success';
+            statusDiv.innerText = msg;
+          } else {
+            statusDiv.className = 'status-banner error';
+            statusDiv.innerText = msg;
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          statusDiv.className = 'status-banner error';
+          statusDiv.innerText = 'Error: ' + err.message;
+        })
+        .webappTriggerReport("NIGHTLY_NARRA", null, null, selectedEntities, null, isTestMode, selectedBanks);
+    }
+
+    function cancelNightlyNarra() {
+      const statusDiv = document.getElementById('run-status');
+      statusDiv.className = 'status-banner loading';
+      statusDiv.innerHTML = '<span class="spinner"></span> Cancelling running tasks...';
+
+      google.script.run
+        .withSuccessHandler(function(msg) {
+          statusDiv.className = 'status-banner success';
+          statusDiv.innerText = msg;
+        })
+        .webappCancelReport("NARRA");
+    }
+
+    // --- UPLOAD & DECRYPTION HANDLER (COMPLETE PIPELINE) ---
+    function customPasswordPrompt(messageHtml) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:99999; backdrop-filter:blur(2px);';
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff; padding:25px; border-radius:8px; width:350px; box-shadow:0 4px 15px rgba(0,0,0,0.3); font-family:"Nunito",sans-serif;';
+
+        const msg = document.createElement('p');
+        msg.innerHTML = messageHtml;
+        msg.style.cssText = 'font-size:13.5px; margin:0 0 15px 0; color:#333; line-height:1.4;';
+        modal.appendChild(msg);
+
+        const input = document.createElement('input');
+        input.type = 'password';
+        input.placeholder = 'Enter password or leave blank...';
+        input.style.cssText = 'width:100%; padding:10px; margin-bottom:20px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px; font-size:14px;';
+        modal.appendChild(input);
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display:flex; justify-content:flex-end; gap:10px;';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.innerText = 'Cancel';
+        cancelBtn.style.cssText = 'padding:8px 15px; background:#f1f1f1; border:1px solid #ccc; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;';
+
+        const okBtn = document.createElement('button');
+        okBtn.innerText = 'OK';
+        okBtn.style.cssText = 'padding:8px 15px; background:#F50057; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold; font-size:12px;';
+
+        btnContainer.appendChild(cancelBtn);
+        btnContainer.appendChild(okBtn);
+        modal.appendChild(btnContainer);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        input.focus();
+
+        const submit = () => { const val = input.value; document.body.removeChild(overlay); resolve(val); };
+        const cancel = () => { document.body.removeChild(overlay); resolve(null); };
+
+        okBtn.onclick = submit;
+        cancelBtn.onclick = cancel;
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') submit(); });
+      });
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function handleNarraUpload() {
+      const fileInput = document.getElementById('narraFileInput');
+      const statusDiv = document.getElementById('upload-status');
+      const btn = document.getElementById('btn-upload-narra');
+
+      if (fileInput.files.length === 0) {
+        statusDiv.className = 'status-banner loading';
+        statusDiv.innerHTML = '<span class="spinner"></span> Checking for stuck files in folder...';
+        btn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+             if (res === "NO_FILES") {
+                statusDiv.className = 'status-banner error';
+                statusDiv.innerText = 'No files found. Please select an Excel file to upload.';
+                btn.disabled = false;
+             } else {
+                statusDiv.className = 'status-banner loading';
+                statusDiv.innerHTML = `<span class="spinner"></span> Found ${res} file(s). Processing now...`;
+                setTimeout(function() { pollNarraImportProgress(res, statusDiv, btn); }, 3000);
+             }
+          })
+          .withFailureHandler(function(e) {
+             statusDiv.className = 'status-banner error';
+             statusDiv.innerText = 'Error: ' + e.message;
+             btn.disabled = false;
+          })
+          .webappProcessStuckFiles("NEW_NARRA");
+        return;
+      }
+
+      btn.disabled = true;
+      statusDiv.className = 'status-banner loading';
+      statusDiv.innerHTML = '<span class="spinner"></span> Preparing files...';
+
+      let files = fileInput.files;
+      let requiresPassword = document.getElementById('requirePasswordCheck').checked;
+      let processedFiles = [];
+
+      for (let i = 0; i < files.length; i++) {
+        let file = files[i];
+        let pwd = "";
+        let base64Data = await readFileAsBase64(file);
+
+        if (requiresPassword) {
+            pwd = await customPasswordPrompt(`Please enter the password for:<br><strong>${file.name}</strong><br><br><span style="font-size:12px; color:#666;">(Leave blank and click OK if the file has no password)</span>`);
+
+            if (pwd === null) {
+              statusDiv.className = 'status-banner error';
+              statusDiv.innerText = 'Upload cancelled by user.';
+              btn.disabled = false;
+              return;
+            }
+
+            if (pwd.trim() !== "") {
+              statusDiv.className = 'status-banner loading';
+              statusDiv.innerHTML = `<span class="spinner"></span> Unlocking ${file.name}... Please wait.`;
+              try {
+                let response = await fetch("<?= SCRIPT_PROPS['PYTHON_DECRYPT_URL'] ?>", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ file: base64Data, password: pwd.trim() })
+                });
+                let result = await response.json();
+
+                if (!response.ok) {
+                  statusDiv.className = 'status-banner error';
+                  statusDiv.innerText = `Incorrect password for ${file.name}! Upload aborted.`;
+                  btn.disabled = false;
+                  return;
+                }
+                base64Data = result.decrypted_base64;
+              } catch(e) {
+                statusDiv.className = 'status-banner error';
+                statusDiv.innerText = 'Failed to connect to decryption server.';
+                btn.disabled = false;
+                return;
+              }
+            }
+        }
+        processedFiles.push({ name: file.name, data: base64Data });
+      }
+
+      let currentIndex = 0;
+      let failedFiles = [];
+
+      const sessionTok = sessionStorage.getItem('pf_user_token');
+
+      function uploadNext() {
+        if (currentIndex >= processedFiles.length) {
+          let successfulCount = processedFiles.length - failedFiles.length;
+          statusDiv.className = 'status-banner loading';
+          statusDiv.innerHTML = `<span class="spinner"></span> Importing rows into database sheet...`;
+
+          google.script.run
+             .withSuccessHandler(function(res) {
+                 // Immediate 0-second confirmation: no artificial timeout delays
+                 statusDiv.className = 'status-banner success';
+                 statusDiv.innerText = `Successfully uploaded and imported ${successfulCount} file(s) into database!`;
+                 btn.disabled = false;
+                 fileInput.value = '';
+
+                 // Immediately refresh the Run Tab dates and banks
+                 loadNarraDataBounds();
+                 // Silently pre-fetch the Audit Logs in background
+                 loadActivityLogs(true);
+             })
+             .withFailureHandler(function(err) {
+                 statusDiv.className = 'status-banner error';
+                 statusDiv.innerText = 'Import Error: ' + err.message;
+                 btn.disabled = false;
+             })
+             .webappProcessStuckFiles("NEW_NARRA");
+          return;
+        }
+
+        let currentFile = processedFiles[currentIndex];
+        statusDiv.className = 'status-banner loading';
+        statusDiv.innerHTML = `<span class="spinner"></span> Uploading file ${currentIndex + 1} of ${processedFiles.length}: ${currentFile.name}...`;
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (response.startsWith("Success")) {
+              currentIndex++;
+              uploadNext();
+            } else {
+              failedFiles.push(currentFile.name);
+              currentIndex++;
+              uploadNext();
+            }
+          })
+          .withFailureHandler(function(error) {
+            failedFiles.push(currentFile.name);
+            currentIndex++;
+            uploadNext();
+          })
+          .webappUploadFile(currentFile.data, currentFile.name, "NEW_NARRA", sessionTok);
+      }
+
+      uploadNext();
+    }
+
+    function pollNarraImportProgress(totalFiles, statusDiv, btn) {
+      google.script.run
+        .withSuccessHandler(function(status) {
+          if (status.done) {
+            statusDiv.className = 'status-banner success';
+            statusDiv.innerText = `Successfully uploaded and imported ${totalFiles} file(s) into database!`;
+            btn.disabled = false;
+            document.getElementById('narraFileInput').value = '';
+            loadNarraDataBounds();
+          } else if (status.inBackground) {
+            statusDiv.className = 'status-banner loading';
+            statusDiv.innerHTML = `<span class="spinner"></span> Importing rows into database... ${status.filesLeft} file(s) remaining.`;
+            setTimeout(function() { pollNarraImportProgress(totalFiles, statusDiv, btn); }, 6000);
+          } else {
+            statusDiv.className = 'status-banner error';
+            statusDiv.innerText = `Sync finished. ${status.filesLeft} file(s) remaining in queue.`;
+            btn.disabled = false;
+          }
+        })
+        .withFailureHandler(function(err) {
+          statusDiv.className = 'status-banner error';
+          statusDiv.innerText = 'Error checking import: ' + err.message;
+          btn.disabled = false;
+        })
+        .webappCheckImportStatus("NEW_NARRA");
+    }
+
+    // --- AUDIT LOGS (MATCHED WITH 2307 PORTAL) ---
+    window.logCurrentPage = 1;
+    window.logRowsPerPage = 5;
+
+    function loadActivityLogs(isSilent = false) {
+      const token = sessionStorage.getItem('pf_user_token');
+      const timeline = document.getElementById('activity-timeline');
+      if (!isSilent && timeline) {
+        timeline.innerHTML = '<p style="color:#8a96a3; font-style:italic;"><span class="spinner"></span> Fetching latest activity logs...</p>';
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            windowNarraLogs = res.logs || [];
+            populateLogActionDropdown(res.actions || []);
+            filterActivityLogs();
+          } else {
+            if (timeline) timeline.innerHTML = '<p style="color:#d93025;">Failed to load logs.</p>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (timeline) timeline.innerHTML = '<p style="color:#d93025;">Error loading logs: ' + err.message + '</p>';
+        })
+        .webappGetNarraActivityLogs(token);
+    }
+
+    function populateLogActionDropdown(actions) {
+      const dropdown = document.getElementById('logActionFilter');
+      if (!dropdown) return;
+      const currentVal = dropdown.value;
+      dropdown.innerHTML = '<option value="">All Actions</option>';
+
+      actions.forEach(action => {
+        const opt = document.createElement('option');
+        opt.value = action;
+        opt.textContent = action;
+        dropdown.appendChild(opt);
+      });
+      dropdown.value = currentVal;
+    }
+
+    function changeLogRowsPerPage() {
+      const el = document.getElementById('logRowsPerPage');
+      if (el) {
+        window.logRowsPerPage = parseInt(el.value, 10);
+        window.logCurrentPage = 1;
+        filterActivityLogs();
+      }
+    }
+
+    function changeLogPage(direction) {
+      window.logCurrentPage += direction;
+      filterActivityLogs();
+    }
+
+    function filterActivityLogs() {
+      if (!windowNarraLogs) return;
+
+      const actionFilter = document.getElementById('logActionFilter') ? document.getElementById('logActionFilter').value : "";
+      const sDateStr = document.getElementById('logStartDate') ? document.getElementById('logStartDate').value : "";
+      const eDateStr = document.getElementById('logEndDate') ? document.getElementById('logEndDate').value : "";
+      const sq = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : "";
+
+      const sTime = sDateStr ? new Date(sDateStr + " 00:00:00").getTime() : 0;
+      const eTime = eDateStr ? new Date(eDateStr + " 23:59:59").getTime() : Infinity;
+
+      const filtered = windowNarraLogs.filter(l => {
+        const lTime = new Date(l.timestamp).getTime();
+        const matchesDate = (lTime >= sTime && lTime <= eTime);
+        const matchesAction = !actionFilter || l.action === actionFilter;
+        const matchesQuery = !sq || l.action.toLowerCase().includes(sq) || l.details.toLowerCase().includes(sq) || l.user.toLowerCase().includes(sq) || l.timestamp.toLowerCase().includes(sq);
+        return matchesDate && matchesAction && matchesQuery;
+      });
+
+      const totalRows = filtered.length;
+      const totalPages = Math.ceil(totalRows / window.logRowsPerPage) || 1;
+      if (window.logCurrentPage < 1) window.logCurrentPage = 1;
+      if (window.logCurrentPage > totalPages) window.logCurrentPage = totalPages;
+
+      const startIdx = (window.logCurrentPage - 1) * window.logRowsPerPage;
+      const endIdx = Math.min(startIdx + window.logRowsPerPage, totalRows);
+      const paginatedData = filtered.slice(startIdx, endIdx);
+
+      renderActivityLogs(paginatedData);
+
+      const pagControls = document.getElementById('log-pagination-controls');
+      if (totalRows > 0 && pagControls) {
+        pagControls.style.display = 'flex';
+        document.getElementById('log-page-info').innerText = `Showing ${startIdx + 1} to ${endIdx} of ${totalRows} entries`;
+        document.getElementById('btn-log-prev').disabled = (window.logCurrentPage === 1);
+        document.getElementById('btn-log-next').disabled = (window.logCurrentPage === totalPages);
+      } else if (pagControls) {
+        pagControls.style.display = 'none';
+      }
+    }
+
+    function renderActivityLogs(logs) {
+      const timeline = document.getElementById('activity-timeline');
+      if (!timeline) return;
+      timeline.innerHTML = "";
+
+      if (!logs || logs.length === 0) {
+        timeline.innerHTML = '<p style="color:#8a96a3; font-style:italic;">No activity recorded yet.</p>';
+        return;
+      }
+
+      logs.forEach(item => {
+        let actionColor = "#1a73e8"; // Blue (default / edit)
+        if (item.action.includes("Deleted") || item.action.includes("Cancelled")) actionColor = "#d93025"; // Red
+        if (item.action.includes("Override") || item.action.includes("Warning")) actionColor = "#f29900"; // Orange
+        if (item.action.includes("Uploaded") || item.action.includes("Generated") || item.action.includes("Saved")) actionColor = "#1e8e3e"; // Green
+
+        const div = document.createElement('div');
+        div.className = 'timeline-item';
+        div.innerHTML = `
+          <div class="timeline-content" style="border-left: 4px solid ${actionColor};">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+              <span style="font-size: 11px; font-weight: bold; color: #8a96a3;">${item.timestamp}</span>
+              <span style="font-size: 11px; color: #8a96a3;">By: <strong>${item.user}</strong></span>
+            </div>
+            <h3 style="color: ${actionColor}; font-weight: 800; margin: 0 0 5px 0; font-size: 14px;">${item.action}</h3>
+            <p style="color: #495057; margin: 0; font-size: 13px;">${item.details}</p>
+          </div>
+        `;
+        timeline.appendChild(div);
+      });
+    }
+
+    function clearLogFilters() {
+      if (document.getElementById('logActionFilter')) document.getElementById('logActionFilter').value = "";
+      if (document.getElementById('logSearchInput')) document.getElementById('logSearchInput').value = "";
+      const sEl = document.getElementById('logStartDate');
+      const eEl = document.getElementById('logEndDate');
+      if (sEl && sEl._flatpickr) sEl._flatpickr.clear();
+      if (eEl && eEl._flatpickr) eEl._flatpickr.clear();
+      window.logCurrentPage = 1;
+      filterActivityLogs();
+    }
+
+    function openDeleteLogsModal() {
+      const modal = document.getElementById('delete-logs-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        flatpickr("#delModalStartDate", { dateFormat: "m/d/Y", allowInput: true, disableMobile: true });
+        flatpickr("#delModalEndDate", { dateFormat: "m/d/Y", allowInput: true, disableMobile: true });
+      }
+    }
+
+    function closeDeleteLogsModal() {
+      const modal = document.getElementById('delete-logs-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function executeDeleteNarraLogs() {
+      const s = document.getElementById('delModalStartDate').value;
+      const e = document.getElementById('delModalEndDate').value;
+      if (!s || !e) {
+        alert("Please select both a Start Date and an End Date.");
+        return;
+      }
+      if (!confirm(`Are you sure you want to permanently delete activity logs from ${s} to ${e}? This action cannot be undone.`)) return;
+
+      const btn = document.getElementById('confirmDeleteLogsBtn');
+      btn.innerText = "Deleting...";
+      btn.disabled = true;
+
+      const token = sessionStorage.getItem('pf_user_token');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.innerText = "Confirm Delete";
+          btn.disabled = false;
+          closeDeleteLogsModal();
+          if (res && res.success) {
+            alert(`Successfully deleted ${res.deleted} log entries.`);
+            loadActivityLogs();
+          } else {
+            alert("Error: " + (res ? res.error : "Unknown error"));
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.innerText = "Confirm Delete";
+          btn.disabled = false;
+          alert("Server Error: " + err.message);
+        })
+        .webappDeleteNarraActivityLogs(s, e, token);
+    }
+
+    // --- USER MANAGEMENT (MATCHED WITH 2307 PORTAL) ---
+    window.userMgmtCache = null;
+
+    function loadUserManagementData() {
+      const token = sessionStorage.getItem('pf_user_token');
+      const loader = document.getElementById('user-mgmt-loader');
+      const tbody = document.getElementById('user-mgmt-tbody');
+
+      if (loader) loader.style.display = 'block';
+      if (tbody) tbody.innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (loader) loader.style.display = 'none';
+          if (res && res.success) {
+            window.userMgmtCache = res.users || [];
+            renderUserManagementTable(window.userMgmtCache);
+          } else {
+            if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:#d93025; text-align:center; padding:20px;">${res ? res.error : 'Failed to fetch users.'}</td></tr>`;
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (loader) loader.style.display = 'none';
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="color:#d93025; text-align:center; padding:20px;">Server Error: ${err.message}</td></tr>`;
+        })
+        .webappGetNarraUsers(token);
+    }
+
+    function filterUserManagementTable() {
+      if (!window.userMgmtCache) return;
+      const query = (document.getElementById('userMgmtSearchInput').value || "").toLowerCase().trim();
+      const roleFilter = document.getElementById('userMgmtRoleFilter').value;
+
+      const filtered = window.userMgmtCache.filter(u => {
+        const matchQuery = !query || 
+            u.name.toLowerCase().includes(query) || 
+            u.email.toLowerCase().includes(query) || 
+            u.department.toLowerCase().includes(query);
+        const matchRole = !roleFilter || u.role === roleFilter;
+        return matchQuery && matchRole;
+      });
+
+      renderUserManagementTable(filtered);
+    }
+
+    function renderUserManagementTable(users) {
+      const tbody = document.getElementById('user-mgmt-tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:#8a96a3;">No employees found.</td></tr>';
+        return;
+      }
+
+      users.forEach((u, idx) => {
+        const tr = document.createElement('tr');
+        const isDeactivated = (u.status.toLowerCase() === 'deactivated');
+        if (isDeactivated) tr.style.backgroundColor = '#fffafb';
+
+        const statusBadge = isDeactivated
+          ? '<span class="badge-soft badge-danger">🔴 Deactivated</span>'
+          : '<span class="badge-soft badge-success">🟢 Active</span>';
+
+        const toggleBtnText = isDeactivated ? "Activate" : "Deactivate";
+        const toggleBtnStyle = isDeactivated
+          ? "background:#e6f4ea; color:#1e8e3e; border:1px solid #ceead6;"
+          : "background:#fff0f0; color:#d93025; border:1px solid #fad2cf;";
+
+        const safeKey = u.email.replace(/[^a-zA-Z0-9]/g, '_');
+
+        tr.innerHTML = `
+          <td style="color:#8a96a3; font-weight:700;">${idx + 1}</td>
+          <td><strong>${u.name}</strong> ${u.isPermanentAdmin ? '<span title="Permanent Super Admin" style="color:#F50057;">👑</span>' : ''}</td>
+          <td>${u.email}</td>
+          <td><span class="badge-soft badge-secondary">${u.department}</span></td>
+          <td>
+            <select id="role_select_${safeKey}" ${u.isPermanentAdmin ? 'disabled title="Permanent Admin"' : ''} style="width:100%; padding:5px 8px; border-radius:4px; border:1px solid #ccc; font-family:'Nunito',sans-serif; font-size:12px; font-weight:bold; background:#fff;">
+              <option value="Super Admin" ${u.role === 'Super Admin' ? 'selected' : ''}>Super Admin</option>
+              <option value="Supervisor" ${u.role === 'Supervisor' ? 'selected' : ''}>Supervisor</option>
+              <option value="Encoder" ${u.role === 'Encoder' ? 'selected' : ''}>Encoder</option>
+              <option value="Viewer" ${u.role === 'Viewer' ? 'selected' : ''}>Viewer</option>
+            </select>
+          </td>
+          <td style="text-align:center;">
+            ${statusBadge}
+            ${!u.isPermanentAdmin ? `<br><button type="button" onclick="toggleUserStatus('${u.email}')" class="ewt-btn" style="margin-top:4px; padding:2px 8px; font-size:10px; ${toggleBtnStyle}">${toggleBtnText}</button>` : ''}
+          </td>
+          <td style="text-align:center;">
+            <button type="button" id="save_user_btn_${safeKey}" onclick="saveUserAccessRow('${u.email}')" class="ewt-btn ewt-btn-edit" style="width:auto; padding:4px 10px;" ${u.isPermanentAdmin ? 'disabled' : ''}>Save</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleUserStatus(targetEmail) {
+      if (!window.userMgmtCache) return;
+      const u = window.userMgmtCache.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
+      if (!u) return;
+      u.status = (u.status.toLowerCase() === 'active') ? 'Deactivated' : 'Active';
+      saveUserAccessRow(targetEmail);
+    }
+
+    function saveUserAccessRow(targetEmail) {
+      if (!window.userMgmtCache) return;
+      const u = window.userMgmtCache.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
+      if (!u) return;
+
+      const safeKey = u.email.replace(/[^a-zA-Z0-9]/g, '_');
+      const roleSelect = document.getElementById('role_select_' + safeKey);
+      const newRole = roleSelect ? roleSelect.value : u.role;
+      const newStatus = u.status;
+      const btn = document.getElementById('save_user_btn_' + safeKey);
+
+      if (btn) {
+        btn.innerText = "Saving...";
+        btn.disabled = true;
+      }
+
+      const token = sessionStorage.getItem('pf_user_token');
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.innerText = "Save";
+            btn.disabled = false;
+          }
+          if (res && res.success) {
+            u.role = newRole;
+            filterUserManagementTable();
+            alert(`Access updated successfully for ${u.name}!`);
+          } else {
+            alert("Error: " + (res ? res.error : "Update failed"));
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.innerText = "Save";
+            btn.disabled = false;
+          }
+          alert("Server Error: " + err.message);
+        })
+        .webappUpdateNarraUserAccess(token, u.email, u.name, newRole, newStatus);
+    }
+  </script>
+</body>
+</html>

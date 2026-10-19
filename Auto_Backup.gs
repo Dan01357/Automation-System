@@ -260,17 +260,3 @@ function resetBackupStateToFresh() {
   console.log("SUCCESS: Backup state cleared. Tonight's midnight trigger will run a 100% fresh cycle.");
 }
 
-function displayAllScriptProperties() {
-  const props = PropertiesService.getScriptProperties().getProperties();
-  
-  console.log("=== ALL SCRIPT PROPERTIES ===");
-  
-  // Loop through and print every single property and its value
-  for (let key in props) {
-    console.log(`Key: ${key}  --->  Value: ${props[key]}`);
-  }
-  
-  // Also log the total count
-  console.log(`TOTAL PROPERTIES: ${Object.keys(props).length}`);
-}
-
