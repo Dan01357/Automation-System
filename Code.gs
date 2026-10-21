@@ -9089,7 +9089,13 @@ function webappCancelReport(portalModule = "MAIN") {
       return "Success: Nightly Narra batch cancelled and portal unlocked.";
     }
 
-    // 2. MAIN WEBSITE CANCELLATION
+    // 2. ISOLATED RMA PORTAL CANCELLATION (ZERO INTERFERENCE WITH OTHER PORTALS)
+    if (mod === "RMA") {
+      clearReportLock("RMA");
+      return "Success: RMA portal locks cleared and unlocked.";
+    }
+
+    // 3. MAIN WEBSITE CANCELLATION
     let ongoingType = props.getProperty(prefix + "_REPORT_TYPE") || props.getProperty("ONGOING_REPORT_TYPE");
     let threadState = props.getProperty(prefix + "_THREAD_STATE") || props.getProperty("THREAD_STATE");
 
@@ -10097,6 +10103,67 @@ function getHREmployeeByEmail(inputEmail, portalType = "SUPPLIER") {
 // ENTERPRISE SYSTEM SETTINGS & LIVE DIAGNOSTICS (PART 2)
 // =========================================================================
 
+// HELPER: Resolves official public entity profiles for all authenticated users
+function _getPublicEntityProfilesObject() {
+  const props = PropertiesService.getScriptProperties();
+  let isDevMode = false;
+  try {
+    const service = ScriptApp.getService();
+    if (service && service.getUrl()) {
+      isDevMode = service.getUrl().toLowerCase().endsWith("/dev");
+    }
+  } catch (e) {}
+
+  const getProp = (key) => {
+    if (isDevMode) {
+      const devVal = props.getProperty(key + '_DEV');
+      if (devVal) return devVal;
+    }
+    return props.getProperty(key) || "";
+  };
+
+  return {
+    signatoryName: getProp('SIGNATORY_2307_NAME'),
+    signatoryTitle: getProp('SIGNATORY_2307_TITLE'),
+    signatoryTin: getProp('SIGNATORY_2307_TIN'),
+    discrepancyTolerance: getProp('DISCREPANCY_TOLERANCE') || "0.05",
+    adminNotificationEmail: getProp('ADMIN_EMAIL'),
+    collectionAssistant: getProp('DEFAULT_COLLECTION_ASSISTANT'),
+
+    formRevisionTitle: getProp('FORM_2307_REVISION_TITLE') || "January 2018 (ENCS)",
+    formTrackingCode: getProp('FORM_2307_TRACKING_CODE') || "2307 01/18ENCS",
+    birLogoId: getProp('BIR_LOGO_DRIVE_ID'),
+    barcodeId: getProp('BARCODE_DRIVE_ID'),
+    signatureId: getProp('SIGNATURE_DRIVE_ID'),
+    formBannerColor: getProp('FORM_2307_BANNER_COLOR') || "#d9d9d9",
+    formBorderWidth: getProp('FORM_2307_BORDER_WIDTH') || "1",
+    part3Row1Desc: getProp('PART3_ROW1_DESC') || "Income payment made by top withholding agent to their local/resident supplier of goods",
+    part3Row2Desc: getProp('PART3_ROW2_DESC') || "Income payments made by top 10,000 private corporations to their local/resident supplier of services",
+    legalPerjuryText: getProp('LEGAL_PERJURY_TEXT'),
+
+    pingconTin: getProp('PINGCON_TIN'),
+    pingconAddr: getProp('PINGCON_ADDR'),
+    keysysTin: getProp('KEYSYS_TIN'),
+    keysysAddr: getProp('KEYSYS_ADDR'),
+    a2zTin: getProp('A2Z_TIN'),
+    a2zAddr: getProp('A2Z_ADDR'),
+    bonitaTin: getProp('BONITA_TIN'),
+    bonitaAddr: getProp('BONITA_ADDR')
+  };
+}
+
+// ENDPOINT: Accessible to ALL verified employees (Encoders, Supervisors, Super Admins)
+function webappGetPublicEntityProfiles(sessionToken) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user) {
+    return { success: false, error: "Authentication required to access company profiles." };
+  }
+  return {
+    success: true,
+    settings: _getPublicEntityProfilesObject()
+  };
+}
+
 function webappGetSystemDiagnosticsAndSettings(sessionToken) {
   const user = getAuthenticatedUser(sessionToken);
   if (!user || user.role !== "Super Admin") {
@@ -10141,38 +10208,6 @@ function webappGetSystemDiagnosticsAndSettings(sessionToken) {
     if (!folder) dbStatus = "Unreachable";
   } catch(e) { dbStatus = "Error: " + e.message; }
 
-  // 3. Dynamic Signatory, Entity Profiles, 2307 Form Studio & Assets
-  const settings = {
-    signatoryName: props.getProperty('SIGNATORY_2307_NAME') || "",
-    signatoryTitle: props.getProperty('SIGNATORY_2307_TITLE') || "",
-    signatoryTin: props.getProperty('SIGNATORY_2307_TIN') || "",
-    discrepancyTolerance: props.getProperty('DISCREPANCY_TOLERANCE') || "",
-    adminNotificationEmail: props.getProperty('ADMIN_EMAIL') || "",
-    collectionAssistant: props.getProperty('DEFAULT_COLLECTION_ASSISTANT') || "",
-    
-    // Form Studio Revisions & Asset Drive IDs
-    formRevisionTitle: props.getProperty('FORM_2307_REVISION_TITLE') || "",
-    formTrackingCode: props.getProperty('FORM_2307_TRACKING_CODE') || "",
-    birLogoId: props.getProperty('BIR_LOGO_DRIVE_ID') || "",
-    barcodeId: props.getProperty('BARCODE_DRIVE_ID') || "",
-    signatureId: props.getProperty('SIGNATURE_DRIVE_ID') || "",
-    formBannerColor: props.getProperty('FORM_2307_BANNER_COLOR') || "",
-    formBorderWidth: props.getProperty('FORM_2307_BORDER_WIDTH') || "",
-    part3Row1Desc: props.getProperty('PART3_ROW1_DESC') || "",
-    part3Row2Desc: props.getProperty('PART3_ROW2_DESC') || "",
-    legalPerjuryText: props.getProperty('LEGAL_PERJURY_TEXT') || "",
-
-    // Multi-Address & Entity Master Configurations
-    pingconTin: props.getProperty('PINGCON_TIN') || "",
-    pingconAddr: props.getProperty('PINGCON_ADDR') || "",
-    keysysTin: props.getProperty('KEYSYS_TIN') || "",
-    keysysAddr: props.getProperty('KEYSYS_ADDR') || "",
-    a2zTin: props.getProperty('A2Z_TIN') || "",
-    a2zAddr: props.getProperty('A2Z_ADDR') || "",
-    bonitaTin: props.getProperty('BONITA_TIN') || "",
-    bonitaAddr: props.getProperty('BONITA_ADDR') || ""
-  };
-
   return {
     success: true,
     diagnostics: {
@@ -10182,7 +10217,7 @@ function webappGetSystemDiagnosticsAndSettings(sessionToken) {
       dbStatus: dbStatus,
       environment: ScriptApp.getService().getUrl().endsWith("/dev") ? "Development (dev)" : "Production (exec)"
     },
-    settings: settings
+    settings: _getPublicEntityProfilesObject()
   };
 }
 
@@ -11196,8 +11231,11 @@ function getSecurePage(page, token, rowParam) {
               return { status: "ERROR", html: "<h2 style='text-align:center; margin-top:50px; font-family:sans-serif; color:#d93025;'>Invalid Link.<br><br><span style='font-size:16px; color:#5f6368;'>Please use the specific company link provided by the administrator (e.g., ?page=Invoice_Search_Pingcon).</span></h2>" };
           }
 
-          // Restrict public access ONLY to URLs that specify the company (must have the underscore)
-          let isPublic = (page.toUpperCase().startsWith("INVOICE_SEARCH_") || page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_"));
+          // Restrict public access to company links, Nightly Narra, and the RMA Portal
+          let isPublic = (page.toUpperCase().startsWith("INVOICE_SEARCH_") || 
+                          page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_") || 
+                          page.toUpperCase().startsWith("RMA_PORTAL") || 
+                          page.toUpperCase().startsWith("PORTAL_RMA"));
           
           let companyContext = "";
           if (isPublic) {
@@ -11210,22 +11248,34 @@ function getSecurePage(page, token, rowParam) {
               }
 
               // Routing for the EWT Client Portal
-          if (page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_")) {
-              if (page.toUpperCase().includes("A2Z2GO")) companyContext = "A2Z2GO";
-              else if (page.toUpperCase().includes("KEYSYS")) companyContext = "KEYSYS";
-              else if (page.toUpperCase().includes("PINGCON")) companyContext = "PINGCON";
-              else if (page.toUpperCase().includes("BONITA")) companyContext = "BONITA";
-              page = "EWT_Client_Portal";
-          }
+              if (page.toUpperCase().startsWith("EWT_CLIENT_PORTAL_")) {
+                  if (page.toUpperCase().includes("A2Z2GO")) companyContext = "A2Z2GO";
+                  else if (page.toUpperCase().includes("KEYSYS")) companyContext = "KEYSYS";
+                  else if (page.toUpperCase().includes("PINGCON")) companyContext = "PINGCON";
+                  else if (page.toUpperCase().includes("BONITA")) companyContext = "BONITA";
+                  page = "EWT_Client_Portal";
+              }
 
-          // Routing for General Nightly Narra Portal (Cross-entity)
-          if (page.toUpperCase() === "NIGHTLY_NARRA" || page.toUpperCase() === "PORTAL_NIGHTLY_NARRA") {
-              companyContext = "ALL";
-              page = "NIGHTLY_NARRA";
-          }
+              // Routing for General Nightly Narra Portal (Cross-entity)
+              if (page.toUpperCase() === "NIGHTLY_NARRA" || page.toUpperCase() === "PORTAL_NIGHTLY_NARRA") {
+                  companyContext = "ALL";
+                  page = "NIGHTLY_NARRA";
+              }
+
+              // Routing for Standalone RMA Portal (Supports zero-typing customer reporting)
+              if (page.toUpperCase().startsWith("RMA_PORTAL") || page.toUpperCase().startsWith("PORTAL_RMA")) {
+                  if (page.toUpperCase().includes("A2Z2GO") || page.toUpperCase().includes("A2Z")) companyContext = "A2Z2GO";
+                  else if (page.toUpperCase().includes("KEYSYS")) companyContext = "KEYSYS";
+                  else if (page.toUpperCase().includes("BONITA")) companyContext = "BONITA";
+                  else companyContext = "PINGCON";
+                  page = "RMA_PORTAL";
+              }
       } else if (page.toUpperCase() === "NIGHTLY_NARRA" || page.toUpperCase() === "PORTAL_NIGHTLY_NARRA") {
           companyContext = "ALL";
           page = "NIGHTLY_NARRA";
+      } else if (page.toUpperCase().startsWith("RMA_PORTAL") || page.toUpperCase().startsWith("PORTAL_RMA")) {
+          companyContext = "PINGCON";
+          page = "RMA_PORTAL";
       }
           
           let template;
@@ -11277,6 +11327,8 @@ function getSecurePage(page, token, rowParam) {
   
           // Pass SCRIPT_PROPS so HTML files inside getSecurePage can read it
           template.SCRIPT_PROPS = PropertiesService.getScriptProperties().getProperties();
+          // Embed pre-rendered corporate profiles directly into the HTML so TIN & Addresses are instant for all users
+          template.PRE_RENDERED_PROFILES_JSON = JSON.stringify(_getPublicEntityProfilesObject());
   
   return { status: "AUTHORIZED", html: template.evaluate().getContent() };
 }
@@ -18768,4 +18820,614 @@ function resetNarraLock() {
   PropertiesService.getScriptProperties().deleteProperty("PENDING_NIGHTLY_NARRA");
   PropertiesService.getScriptProperties().deleteProperty("CANCEL_NIGHTLY_NARRA");
   console.log("SUCCESS: Nightly Narra locks have been completely erased. Portal unlocked!");
+}
+
+// =========================================================================
+// RETURN MERCHANDISE AUTHORIZATION (RMA) ARCHITECTURE ENGINE (PART 1)
+// =========================================================================
+
+function _getRmaDatabaseFolder() {
+  const props = PropertiesService.getScriptProperties();
+  let isDevMode = false;
+  try {
+    let service = ScriptApp.getService();
+    if (service && service.getUrl()) {
+      isDevMode = service.getUrl().toLowerCase().endsWith("/dev");
+    }
+  } catch (err) { isDevMode = false; }
+  
+  let folderId = isDevMode
+      ? (props.getProperty('DATABASE_FOLDER_ID_DEV') || props.getProperty('DATABASE_FOLDER_ID'))
+      : (props.getProperty('DATABASE_FOLDER_ID') || DATABASE_FOLDER_ID);
+      
+  if (!folderId) throw new Error("Database folder property for RMA is not configured in Script Properties.");
+  return DriveApp.getFolderById(folderId);
+}
+
+function _getRmaPhotosFolder() {
+  const props = PropertiesService.getScriptProperties();
+  let isDevMode = false;
+  try {
+    let service = ScriptApp.getService();
+    if (service && service.getUrl()) {
+      isDevMode = service.getUrl().toLowerCase().endsWith("/dev");
+    }
+  } catch (err) { isDevMode = false; }
+
+  let folderId = isDevMode
+      ? (props.getProperty('RMA_PHOTOS_FOLDER_ID_DEV') || props.getProperty('RMA_PHOTOS_FOLDER_ID'))
+      : props.getProperty('RMA_PHOTOS_FOLDER_ID');
+
+  if (!folderId) throw new Error("RMA Photos folder ID is missing from Script Properties (RMA_PHOTOS_FOLDER_ID / RMA_PHOTOS_FOLDER_ID_DEV).");
+  return DriveApp.getFolderById(folderId);
+}
+
+function _getRmaDatabaseSheet(targetYear) {
+  const folder = _getRmaDatabaseFolder();
+  const yr = targetYear || new Date().getFullYear();
+  const fileName = `RMA_Data_${yr}`;
+  const files = folder.getFilesByName(fileName);
+  let ss = null;
+
+  if (files.hasNext()) {
+    ss = SpreadsheetApp.open(files.next());
+  } else {
+    ss = SpreadsheetApp.create(fileName);
+    DriveApp.getFileById(ss.getId()).moveTo(folder);
+    const sheet = ss.insertSheet("RMA_Records", 0);
+    const headers = [
+      "RMA Ticket ID", "Filing Date (MM/DD/YYYY)", "Customer Name", "Customer Phone", 
+      "SI No.", "DR No.", "PO No.", "Item SKU", "Item Description", "Item Qty", 
+      "Defect Category", "Defect Description", "Defect Photo URL", "Defect Photo File ID", 
+      "Status", "Resolution Notes", "Filed By", "Company Context", "Timestamp"
+    ];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f3f3f3");
+    sheet.setFrozenRows(1);
+    let orphan = ss.getSheetByName("Sheet1");
+    if (orphan && ss.getSheets().length > 1) {
+      try { ss.deleteSheet(orphan); } catch(e){}
+    }
+  }
+  return ss.getSheetByName("RMA_Records") || ss.getSheets()[0];
+}
+
+function generateSpecializedRmaId(targetYear) {
+  const yr = targetYear || new Date().getFullYear();
+  const sheet = _getRmaDatabaseSheet(yr);
+  const data = sheet.getDataRange().getValues();
+  
+  let maxSeq = 0;
+  for (let i = 1; i < data.length; i++) {
+    const rawId = String(data[i][0] || "").trim();
+    const parts = rawId.split('-');
+    if (parts.length >= 4 && parts[0] === "RMA" && parts[1] === String(yr)) {
+      const seq = parseInt(parts[2], 10);
+      if (!isNaN(seq) && seq > maxSeq) {
+        maxSeq = seq;
+      }
+    }
+  }
+
+  const nextSeq = maxSeq + 1;
+  const seqPadded = ('0000' + nextSeq).slice(-4);
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let randomSuffix = "";
+  for (let c = 0; c < 4; c++) {
+    randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return `RMA-${yr}-${seqPadded}-${randomSuffix}`;
+}
+
+// -------------------------------------------------------------------------
+// SIMULATION ENGINE: WORKMATE API #1 (ORDER & ITEMS LOOKUP)
+// -------------------------------------------------------------------------
+
+function webappSimulateOrderLookup(query, companyContext) {
+  const cleanQ = String(query || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!cleanQ) return { success: false, error: "Please provide an Invoice, DR, or PO number to search." };
+
+  // Realistic enterprise simulation data with zero typing required on items
+  const mockOrderCatalog = [
+    {
+      siNo: "1040022884884",
+      drNo: "51557482",
+      poNo: "29771",
+      customerName: "SUY SING COMMERCIAL CORPORATION",
+      customerPhone: "0917-555-0199",
+      deliveryDate: "09/24/2026",
+      items: [
+        { sku: "ALB01B", itemName: "Albatross Ref Lemon 12/100G (16)", qtyPurchased: 10, uom: "PCK" },
+        { sku: "ALB03B", itemName: "Albatross Ref Strawberry 12/100G (16)", qtyPurchased: 10, uom: "PCK" },
+        { sku: "ALB05B", itemName: "Albatross Ref Lemon 12/50G", qtyPurchased: 30, uom: "PCK" }
+      ]
+    },
+    {
+      siNo: "88912",
+      drNo: "44102",
+      poNo: "PO-5521",
+      customerName: "XYZ MOBILE TRADING CORP.",
+      customerPhone: "0918-888-2341",
+      deliveryDate: "10/12/2026",
+      items: [
+        { sku: "APL-IP15P-256", itemName: "Apple iPhone 15 Pro 256GB - Titanium", qtyPurchased: 5, uom: "UNT" },
+        { sku: "APL-AC-20W", itemName: "Apple 20W USB-C Power Adapter", qtyPurchased: 10, uom: "PC" },
+        { sku: "ACC-MAG-CASE", itemName: "MagSafe Protective Clear Case", qtyPurchased: 15, uom: "PC" }
+      ]
+    },
+    {
+      siNo: "992410",
+      drNo: "66219",
+      poNo: "PO-89914",
+      customerName: "METRO HYPERMARKET SUPPLIES INC.",
+      customerPhone: "0922-345-6789",
+      deliveryDate: "10/14/2026",
+      items: [
+        { sku: "SAM-S24-128", itemName: "Samsung Galaxy S24 128GB Onyx Black", qtyPurchased: 3, uom: "UNT" },
+        { sku: "LOGI-M331-BK", itemName: "Logitech Silent Plus Wireless Mouse", qtyPurchased: 20, uom: "PC" }
+      ]
+    }
+  ];
+
+  // Try matching any document number (SI, DR, or PO)
+  let matchedOrder = mockOrderCatalog.find(o => 
+    o.siNo.toUpperCase().includes(cleanQ) || 
+    o.drNo.toUpperCase().includes(cleanQ) || 
+    o.poNo.toUpperCase().replace(/[^A-Z0-9]/g, '').includes(cleanQ)
+  );
+
+  // Fallback: If not an exact match, generate dynamic realistic order for any input
+  if (!matchedOrder) {
+    matchedOrder = {
+      siNo: cleanQ,
+      drNo: "DR-" + Math.floor(10000 + Math.random() * 90000),
+      poNo: "PO-" + Math.floor(1000 + Math.random() * 9000),
+      customerName: "VERIFIED WHOLESALE PARTNER",
+      customerPhone: "0917-000-0000",
+      deliveryDate: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy"),
+      items: [
+        { sku: "PRD-001", itemName: "Item 1 from Invoice #" + cleanQ, qtyPurchased: 1, uom: "PC" },
+        { sku: "PRD-002", itemName: "Item 2 from Invoice #" + cleanQ, qtyPurchased: 2, uom: "PC" }
+      ]
+    };
+  }
+
+  return { success: true, order: matchedOrder };
+}
+
+function webappSimulateRecentOrders(searchTerm, companyContext) {
+  // Returns recent deliveries for non-technical customers who don't have paper
+  const sampleDeliveries = [
+    {
+      deliverySummary: "Suy Sing - Delivery from Sept 24 (Albatross Products - 3 items)",
+      siNo: "1040022884884",
+      drNo: "51557482",
+      poNo: "29771",
+      customerName: "SUY SING COMMERCIAL CORPORATION",
+      date: "09/24/2026"
+    },
+    {
+      deliverySummary: "XYZ Mobile - Delivery from Oct 12 (iPhones & Accessories - 3 items)",
+      siNo: "88912",
+      drNo: "44102",
+      poNo: "PO-5521",
+      customerName: "XYZ MOBILE TRADING CORP.",
+      date: "10/12/2026"
+    },
+    {
+      deliverySummary: "Metro Hypermarket - Delivery from Oct 14 (Electronics - 2 items)",
+      siNo: "992410",
+      drNo: "66219",
+      poNo: "PO-89914",
+      customerName: "METRO HYPERMARKET SUPPLIES INC.",
+      date: "10/14/2026"
+    }
+  ];
+
+  const q = String(searchTerm || "").trim().toLowerCase();
+  const filtered = !q 
+    ? sampleDeliveries 
+    : sampleDeliveries.filter(d => 
+        d.deliverySummary.toLowerCase().includes(q) || 
+        d.customerName.toLowerCase().includes(q) ||
+        d.siNo.toLowerCase().includes(q)
+      );
+
+  return { success: true, deliveries: filtered };
+}
+
+// -------------------------------------------------------------------------
+// RMA TRANSACTION & PHOTO ENGINE (PART 2)
+// -------------------------------------------------------------------------
+
+function webappUploadRmaDefectPhoto(base64Data, fileName, rmaTempId, companyContext) {
+  try {
+    if (!base64Data || base64Data.trim() === "") {
+      return { success: false, error: "Photo data is empty. A photo of the defect is required." };
+    }
+
+    const folder = _getRmaPhotosFolder();
+    const rawData = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    
+    let mimeType = MimeType.JPEG;
+    let ext = "jpg";
+    if (fileName && (fileName.toLowerCase().endsWith(".png") || base64Data.includes("image/png"))) {
+      mimeType = MimeType.PNG;
+      ext = "png";
+    }
+
+    const cleanId = String(rmaTempId || "RMA").replace(/[^a-zA-Z0-9_-]/g, '');
+    const cleanFileName = `${cleanId}_Defect_${Date.now()}.${ext}`;
+    const blob = Utilities.newBlob(Utilities.base64Decode(rawData), mimeType, cleanFileName);
+    
+    const file = folder.createFile(blob);
+    // Allow thumbnail/view access so photos display inside the management dashboard
+    try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch(e){}
+
+    return {
+      success: true,
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      thumbnailUrl: `https://drive.google.com/thumbnail?id=${file.getId()}&sz=w800`
+    };
+  } catch(err) {
+    return { success: false, error: "Failed to upload defect photo: " + err.message };
+  }
+}
+
+function webappSubmitRmaTicket(payload, sessionToken = null) {
+  try {
+    // 1. STRICT VALIDATION: Defect photo is strictly mandatory
+    if (!payload.photoFileId && !payload.photoUrl) {
+      return { success: false, error: "Validation Failed: A photo of the damaged/defective product is strictly required." };
+    }
+    if (!payload.customerName || !payload.itemDescription) {
+      return { success: false, error: "Validation Failed: Customer Name and Item Description are required." };
+    }
+
+    const yr = new Date().getFullYear();
+    const rmaId = generateSpecializedRmaId(yr);
+    const filingDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
+    
+    let filedByUser = resolveUserIdentityString(sessionToken);
+    if (!sessionToken && payload.filedByCustomer) {
+      filedByUser = `${payload.customerName} (Direct Client Submission)`;
+    }
+
+    const rmaRow = [
+      rmaId,
+      filingDate,
+      payload.customerName || "",
+      payload.customerPhone || "",
+      payload.siNo || "",
+      payload.drNo || "",
+      payload.poNo || "",
+      payload.itemSku || "",
+      payload.itemDescription || "",
+      parseFloat(payload.itemQty) || 1,
+      payload.defectCategory || "Damaged on Arrival",
+      payload.defectDescription || "",
+      payload.photoUrl || "",
+      payload.photoFileId || "",
+      "Pending Inspection",
+      payload.resolutionNotes || "",
+      filedByUser,
+      String(payload.companyContext || "PINGCON").toUpperCase(),
+      timestamp
+    ];
+
+    // Micro-lock: Holds for 0.2s only while writing to the sheet
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(15000);
+      const sheet = _getRmaDatabaseSheet(yr);
+      sheet.appendRow(rmaRow);
+      SpreadsheetApp.flush();
+    } finally {
+      try { lock.releaseLock(); } catch(e){}
+    }
+
+    // 2. SIMULATE WORKMATE API #2 (RETURNED ITEMS LOGGING)
+    const api2Response = _simulateReturnedItemsApi({
+      rmaTicketId: rmaId,
+      customer: payload.customerName,
+      sku: payload.itemSku,
+      item: payload.itemDescription,
+      qty: payload.itemQty,
+      si: payload.siNo,
+      photoUrl: payload.photoUrl,
+      reason: payload.defectDescription
+    });
+
+    // 3. Log to isolated RMA Audit Log
+    logRmaActivity(
+      payload.companyContext || "PINGCON",
+      "RMA Ticket Submitted",
+      `Ticket: ${rmaId} | Item: ${payload.itemDescription} | Client: ${payload.customerName}`,
+      sessionToken
+    );
+
+    return {
+      success: true,
+      rmaId: rmaId,
+      status: "Pending Inspection",
+      returnedItemsApiStatus: api2Response.status,
+      timestamp: timestamp
+    };
+  } catch(err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------------------
+// SIMULATION ENGINE: WORKMATE API #2 (RETURNED ITEMS API RECEIVER)
+// -------------------------------------------------------------------------
+
+function _simulateReturnedItemsApi(returnPayload) {
+  // When your workmate deploys their real API, this block will call UrlFetchApp.fetch(API_URL, ...)
+  console.log("[Simulated Returned Items API] Received payload:", JSON.stringify(returnPayload));
+  return {
+    success: true,
+    status: "Logged in Warehouse Return Queue",
+    externalTrackingId: "WH-RET-" + Math.floor(100000 + Math.random() * 900000)
+  };
+}
+
+// -------------------------------------------------------------------------
+// RMA MANAGEMENT & DASHBOARD APIS (SUPERVISORS / ADMINS)
+// -------------------------------------------------------------------------
+
+function webappGetRmaTickets(companyContext, statusFilter = null, targetYear = null) {
+  try {
+    const yr = targetYear || new Date().getFullYear();
+    const sheet = _getRmaDatabaseSheet(yr);
+    const data = sheet.getDataRange().getValues();
+    const results = [];
+
+    if (data.length <= 1) return { success: true, tickets: [] };
+
+    const ctxUpper = String(companyContext || "ALL").toUpperCase().trim();
+    const isAll = (ctxUpper === "ALL");
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const rowCtx = String(row[17] || "").toUpperCase().trim();
+
+      if (!isAll && rowCtx && !rowCtx.includes(ctxUpper)) continue;
+
+      const rowStatus = String(row[14] || "Pending Inspection").trim();
+      if (statusFilter && statusFilter !== "ALL" && rowStatus !== statusFilter) continue;
+
+      results.push({
+        rmaId: String(row[0] || ""),
+        filingDate: row[1] instanceof Date ? Utilities.formatDate(row[1], Session.getScriptTimeZone(), "MM/dd/yyyy") : String(row[1] || ""),
+        customerName: String(row[2] || ""),
+        customerPhone: String(row[3] || ""),
+        siNo: String(row[4] || ""),
+        drNo: String(row[5] || ""),
+        poNo: String(row[6] || ""),
+        itemSku: String(row[7] || ""),
+        itemDescription: String(row[8] || ""),
+        itemQty: row[9] || 1,
+        defectCategory: String(row[10] || ""),
+        defectDescription: String(row[11] || ""),
+        photoUrl: String(row[12] || ""),
+        photoFileId: String(row[13] || ""),
+        status: rowStatus,
+        resolutionNotes: String(row[15] || ""),
+        filedBy: String(row[16] || ""),
+        companyContext: rowCtx,
+        timestamp: String(row[18] || "")
+      });
+    }
+
+    // Newest first
+    results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return { success: true, tickets: results };
+  } catch(err) {
+    return { success: false, error: err.message, tickets: [] };
+  }
+}
+
+function webappUpdateRmaStatus(rmaId, newStatus, resolutionNotes, sessionToken) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user || (user.role !== "Super Admin" && user.role !== "Supervisor")) {
+    return { success: false, error: "Permission Denied: Only Supervisors or Super Admins can update return statuses." };
+  }
+
+  const yr = new Date().getFullYear();
+  const sheet = _getRmaDatabaseSheet(yr);
+  const data = sheet.getDataRange().getValues();
+  let foundRow = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim().toUpperCase() === String(rmaId).trim().toUpperCase()) {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  if (foundRow === -1) {
+    return { success: false, error: "RMA Ticket ID not found in database: " + rmaId };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    sheet.getRange(foundRow, 15).setValue(newStatus); // Status Column
+    if (resolutionNotes) {
+      sheet.getRange(foundRow, 16).setValue(resolutionNotes); // Resolution Notes Column
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    try { lock.releaseLock(); } catch(e){}
+  }
+
+  logRmaActivity(
+    "SYSTEM",
+    "RMA Status Updated",
+    `Ticket: ${rmaId} -> Status: ${newStatus} | By: ${user.name}`,
+    sessionToken
+  );
+
+  return { success: true };
+}
+
+function webappDeleteRmaTickets(rmaIds, sessionToken) {
+  const user = getAuthenticatedUser(sessionToken);
+  if (!user || user.role !== "Super Admin") {
+    return { success: false, error: "Permission Denied: Only Super Admins can delete RMA records." };
+  }
+
+  if (!Array.isArray(rmaIds) || rmaIds.length === 0) {
+    return { success: false, error: "No RMA IDs provided for deletion." };
+  }
+
+  const yr = new Date().getFullYear();
+  const sheet = _getRmaDatabaseSheet(yr);
+  const data = sheet.getDataRange().getValues();
+  const targetIdsUpper = rmaIds.map(id => String(id).trim().toUpperCase());
+  let deletedCount = 0;
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(15000);
+    // Traverse backwards to safely delete multiple rows
+    for (let i = data.length - 1; i >= 1; i--) {
+      const rowId = String(data[i][0] || "").trim().toUpperCase();
+      if (targetIdsUpper.includes(rowId)) {
+        sheet.deleteRow(i + 1);
+        deletedCount++;
+      }
+    }
+    SpreadsheetApp.flush();
+  } finally {
+    try { lock.releaseLock(); } catch(e){}
+  }
+
+  logRmaActivity(
+    "SYSTEM",
+    "Deleted RMA Records",
+    `Permanently removed ${deletedCount} RMA ticket(s)`,
+    sessionToken
+  );
+
+  return { success: true, deleted: deletedCount };
+}
+
+// -------------------------------------------------------------------------
+// DEDICATED RMA AUDIT LOGGER (ISOLATED DATABASE)
+// -------------------------------------------------------------------------
+
+function logRmaActivity(companyContext, action, details, sessionToken = null) {
+  try {
+    const yr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy");
+    const folder = _getRmaDatabaseFolder();
+    const sheetName = `Activity_Logs_RMA_${yr}`;
+    const files = folder.getFilesByName(sheetName);
+    let ss = null;
+
+    if (files.hasNext()) {
+      ss = SpreadsheetApp.open(files.next());
+    } else {
+      ss = SpreadsheetApp.create(sheetName);
+      DriveApp.getFileById(ss.getId()).moveTo(folder);
+      const s = ss.insertSheet("Logs", 0);
+      s.appendRow(["Timestamp", "Company Context", "User Email / Actor", "Action", "Details"]);
+      s.getRange("A1:E1").setFontWeight("bold").setBackground("#f3f3f3");
+      s.setFrozenRows(1);
+      const orphan = ss.getSheetByName("Sheet1");
+      if (orphan && ss.getSheets().length > 1) {
+        try { ss.deleteSheet(orphan); } catch(e){}
+      }
+    }
+
+    const s = ss.getSheetByName("Logs") || ss.getSheets()[0];
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss");
+    const userIdentifier = resolveUserIdentityString(sessionToken);
+
+    s.appendRow([timestamp, String(companyContext).toUpperCase(), userIdentifier, action, details]);
+    SpreadsheetApp.flush();
+  } catch(e) {
+    console.warn("Failed to log RMA activity: " + e.message);
+  }
+}
+
+function webappGetRmaActivityLogs(companyContext) {
+  try {
+    const yr = new Date().getFullYear();
+    const folder = _getRmaDatabaseFolder();
+    const sheetName = `Activity_Logs_RMA_${yr}`;
+    const files = folder.getFilesByName(sheetName);
+    const results = [];
+
+    if (files.hasNext()) {
+      const ss = SpreadsheetApp.open(files.next());
+      const s = ss.getSheetByName("Logs");
+      if (s) {
+        const data = s.getDataRange().getValues();
+        const ctxUpper = String(companyContext || "ALL").toUpperCase().trim();
+        const isAll = (ctxUpper === "ALL");
+
+        for (let i = 1; i < data.length; i++) {
+          const r = data[i];
+          const rowCtx = String(r[1] || "").toUpperCase();
+          if (!isAll && !rowCtx.includes(ctxUpper)) continue;
+
+          results.push({
+            timestamp: r[0] instanceof Date ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), "MM/dd/yyyy HH:mm:ss") : String(r[0] || ""),
+            user: String(r[2] || ""),
+            action: String(r[3] || ""),
+            details: String(r[4] || "")
+          });
+        }
+      }
+    }
+
+    results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return { success: true, logs: results };
+  } catch(e) {
+    return { success: false, logs: [], error: e.message };
+  }
+}
+
+function TEST_rmaBackendPart1() {
+  const id = generateSpecializedRmaId(2026);
+  console.log("Generated Specialized ID:", id); // Expected: RMA-2026-0001-XXXX
+  
+  const lookup = webappSimulateOrderLookup("88912", "PINGCON");
+  console.log("Mock Order Lookup Found:", lookup.order.customerName, "| Items:", lookup.order.items.length);
+}
+
+function TEST_rmaBackendPart2() {
+  // 1. Test Ticket Submission with Simulation Engine
+  const testPayload = {
+    customerName: "SUY SING COMMERCIAL CORPORATION",
+    customerPhone: "0917-555-0199",
+    siNo: "1040022884884",
+    drNo: "51557482",
+    poNo: "29771",
+    itemSku: "ALB01B",
+    itemDescription: "Albatross Ref Lemon 12/100G (16)",
+    itemQty: 2,
+    defectCategory: "Broken / Leaked Packaging",
+    defectDescription: "Two containers arrived cracked with liquid leakage.",
+    photoUrl: "https://drive.google.com/thumbnail?id=sample_test_id",
+    photoFileId: "sample_test_id",
+    companyContext: "PINGCON"
+  };
+
+  const submitResult = webappSubmitRmaTicket(testPayload);
+  console.log("Submission Result:", JSON.stringify(submitResult));
+
+  // 2. Test Reading Tickets Back from Database
+  const getResult = webappGetRmaTickets("PINGCON");
+  console.log("Total Tickets in Database:", getResult.tickets.length);
+  if (getResult.tickets.length > 0) {
+    console.log("Latest Ticket ID:", getResult.tickets[0].rmaId);
+    console.log("Item:", getResult.tickets[0].itemDescription);
+    console.log("Status:", getResult.tickets[0].status);
+  }
 }

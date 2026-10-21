@@ -2378,16 +2378,17 @@
                 disableMobile: true
             });
 
-            // Silent Settings Bootstrapper: Pre-loads Visual Studio styles immediately on startup
+            // Silent Settings Bootstrapper: Pre-loads corporate profiles for all authenticated roles without permission rejection
             const startupToken = sessionStorage.getItem('pf_user_token');
             if (startupToken) {
               google.script.run
                 .withSuccessHandler(function(res) {
-                  if (res && res.success) {
-                    window.systemSettingsCache = res;
+                  if (res && res.success && res.settings) {
+                    if (!window.systemSettingsCache) window.systemSettingsCache = { settings: {} };
+                    window.systemSettingsCache.settings = Object.assign(window.systemSettingsCache.settings || {}, res.settings);
                   }
                 })
-                .webappGetSystemDiagnosticsAndSettings(startupToken);
+                .webappGetPublicEntityProfiles(startupToken);
             }
 
             flatpickr(".flatpickr-range", {
@@ -2567,7 +2568,14 @@
     // =========================================================================
     // SYSTEM SETTINGS & DIAGNOSTICS CONTROLLER (PART 2)
     // =========================================================================
-    window.systemSettingsCache = null;
+    // Auto-hydrate settings immediately from server-side pre-rendered JSON (accessible to Encoders, Supervisors, and Admins)
+    let serverRenderedSettings = {};
+    try {
+      serverRenderedSettings = <?!= (typeof PRE_RENDERED_PROFILES_JSON !== 'undefined' && PRE_RENDERED_PROFILES_JSON) ? PRE_RENDERED_PROFILES_JSON : '{}' ?>;
+    } catch(e) {
+      serverRenderedSettings = {};
+    }
+    window.systemSettingsCache = { settings: serverRenderedSettings };
 
     function showSettingsSection() {
       saveWorkspaceState();
@@ -2730,6 +2738,16 @@
       localStorage.setItem('cfg_bir_logo_id', payload.birLogoId);
       localStorage.setItem('cfg_barcode_id', payload.barcodeId);
       localStorage.setItem('cfg_signature_id', payload.signatureId);
+
+      // Save entity profiles and multi-address lists so browser local memory stays in sync
+      localStorage.setItem('cfg_pingcon_tin', payload.pingconTin);
+      localStorage.setItem('cfg_pingcon_addr', payload.pingconAddr);
+      localStorage.setItem('cfg_keysys_tin', payload.keysysTin);
+      localStorage.setItem('cfg_keysys_addr', payload.keysysAddr);
+      localStorage.setItem('cfg_a2z_tin', payload.a2zTin);
+      localStorage.setItem('cfg_a2z_addr', payload.a2zAddr);
+      localStorage.setItem('cfg_bonita_tin', payload.bonitaTin);
+      localStorage.setItem('cfg_bonita_addr', payload.bonitaAddr);
 
       if (!window.systemSettingsCache) window.systemSettingsCache = { settings: {} };
       window.systemSettingsCache.settings = Object.assign(window.systemSettingsCache.settings || {}, payload);
